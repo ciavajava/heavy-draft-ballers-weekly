@@ -143,6 +143,14 @@ const globalStyle = `
   *{box-sizing:border-box;} body{background:var(--bg);color:var(--text);margin:0;}
   input,select,textarea{background:var(--btn-bg)!important;color:var(--text)!important;border-color:var(--border)!important;}
   input::placeholder,textarea::placeholder{color:var(--text-faint)!important;}
+  @keyframes flashBgGreen { 0%{background:#d4f7d4;} 100%{background:transparent;} }
+  @keyframes flashBgRed   { 0%{background:#fdd;} 100%{background:transparent;} }
+  @keyframes flashTxtGreen { 0%{color:#1a7a1a;} 100%{color:inherit;} }
+  @keyframes flashTxtRed   { 0%{color:#c00;} 100%{color:inherit;} }
+  .flash-bg-up   { animation: flashBgGreen 1.5s ease-out forwards; }
+  .flash-bg-down { animation: flashBgRed   1.5s ease-out forwards; }
+  .flash-txt-up   { animation: flashTxtGreen 1.5s ease-out forwards; }
+  .flash-txt-down { animation: flashTxtRed   1.5s ease-out forwards; }
 `;
 
 export default function App() {
@@ -154,7 +162,46 @@ export default function App() {
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [loading, setLoading] = useState(true);
 
-  const [commUnlocked, setCommUnlocked] = useState(false);
+  const [prevTeams, setPrevTeams] = useState<Record<string, any>>({});
+  const [flashMap, setFlashMap] = useState<Record<string, string>>({});
+
+  const triggerFlash = (newTeams: Team[], oldTeams: Record<string, any>) => {
+    const flashes: Record<string, string> = {};
+    const newScored = computeRoto(newTeams);
+    const oldScored = oldTeams.scored as ScoredTeam[] | undefined;
+
+    newTeams.forEach(t => {
+      const old = oldTeams[t.name];
+      if (!old) return;
+      CATS.forEach(c => {
+        const statKey = `${t.name}__stat__${c.key}`;
+        const newVal = (t as any)[c.key];
+        const oldVal = old[c.key];
+        if (newVal !== oldVal) {
+          const improved = c.dir === 1 ? newVal > oldVal : newVal < oldVal;
+          flashes[statKey] = improved ? "flash-txt-up" : "flash-txt-down";
+        }
+      });
+    });
+
+    if (oldScored) {
+      newScored.forEach(t => {
+        const oldT = oldScored.find(o => o.name === t.name);
+        if (!oldT) return;
+        CATS.forEach(c => {
+          const ptsKey = `${t.name}__pts__${c.key}`;
+          if (t.pts[c.key] !== oldT.pts[c.key]) {
+            flashes[ptsKey] = t.pts[c.key] > oldT.pts[c.key] ? "flash-bg-up" : "flash-bg-down";
+          }
+        });
+      });
+    }
+
+    if (Object.keys(flashes).length > 0) {
+      setFlashMap(flashes);
+      setTimeout(() => setFlashMap({}), 1600);
+    }
+  };
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
   const [commSection, setCommSection] = useState<"history" | "sync" | "manual">("history");
@@ -167,7 +214,27 @@ export default function App() {
   useEffect(() => {
     const load = async (initial = false) => {
       const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
-      if (teamsVal) setLiveTeams(JSON.parse(teamsVal));
+      if (teamsVal) {
+        const newTeams = JSON.parse(teamsVal);
+        if (!initial) {
+          setPrevTeams(prev => {
+            triggerFlash(newTeams, prev);
+            return prev;
+          });
+          setPrevTeams(prev => {
+            const map: Record<string, any> = {};
+            newTeams.forEach((t: Team) => { map[t.name] = t; });
+            map.scored = computeRoto(newTeams);
+            return map;
+          });
+        } else {
+          const map: Record<string, any> = {};
+          newTeams.forEach((t: Team) => { map[t.name] = t; });
+          map.scored = computeRoto(newTeams);
+          setPrevTeams(map);
+        }
+        setLiveTeams(newTeams);
+      }
       if (tsVal) setLastUpdated(tsVal);
       if (initial) {
         const ww: Record<number, WeekWinner> = {};
@@ -393,8 +460,8 @@ export default function App() {
                     <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
                     {CATS.map(c => (
                       <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
-                        <span style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>{c.fmt(t[c.key as keyof Team] as number)}</span>
-                        <span style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>{fmtPts(t.pts[c.key])} pts</span>
+                        <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>{c.fmt(t[c.key as keyof Team] as number)}</span>
+                        <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>{fmtPts(t.pts[c.key])} pts</span>
                       </td>
                     ))}
                     <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
