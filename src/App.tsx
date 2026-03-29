@@ -24,8 +24,8 @@ const CATS = [
   { key: "ops",  label: "OPS",  dir: 1,  fmt: (v: number) => v.toFixed(3).replace("0.", ".") },
   { key: "w",    label: "W",    dir: 1,  fmt: (v: number) => v },
   { key: "k",    label: "K",    dir: 1,  fmt: (v: number) => v },
-  { key: "era",  label: "ERA",  dir: -1, fmt: (v: number) => v.toFixed(3) },
-  { key: "whip", label: "WHIP", dir: -1, fmt: (v: number) => v.toFixed(3) },
+  { key: "era",  label: "ERA",  dir: -1, fmt: (v: number) => v.toFixed(2) },
+  { key: "whip", label: "WHIP", dir: -1, fmt: (v: number) => v.toFixed(2) },
   { key: "qs",   label: "QS",   dir: 1,  fmt: (v: number) => v },
   { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => v },
 ];
