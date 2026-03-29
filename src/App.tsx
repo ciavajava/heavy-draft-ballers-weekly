@@ -30,7 +30,7 @@ const CATS = [
   { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => v },
 ];
 
-const TOTAL_WEEKS = 22;
+const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 
 type Team = { name: string; r: number; hr: number; rbi: number; sb: number; avg: number; ops: number; w: number; k: number; era: number; whip: number; qs: number; svh: number };
