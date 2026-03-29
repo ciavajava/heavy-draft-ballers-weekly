@@ -87,6 +87,54 @@ async function kvSet(key: string, value: string) {
   await fetch("/api/storage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
 }
 
+// Color tokens — explicit values that work in both light and dark mode
+const C = {
+  bg: "var(--bg, #ffffff)",
+  bgAlt: "var(--bg-alt, #f9f9f9)",
+  border: "var(--border, #e5e5e5)",
+  borderLight: "var(--border-light, #f0f0f0)",
+  text: "var(--text, #111111)",
+  textMuted: "var(--text-muted, #888888)",
+  textFaint: "var(--text-faint, #aaaaaa)",
+  btnBg: "var(--btn-bg, #ffffff)",
+  btnActive: "var(--btn-active, #f0f0f0)",
+};
+
+const globalStyle = `
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f9f9f9;
+    --border: #e5e5e5;
+    --border-light: #f0f0f0;
+    --text: #111111;
+    --text-muted: #666666;
+    --text-faint: #aaaaaa;
+    --btn-bg: #ffffff;
+    --btn-active: #f0f0f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --bg-alt: #242424;
+      --border: #333333;
+      --border-light: #2a2a2a;
+      --text: #f0f0f0;
+      --text-muted: #aaaaaa;
+      --text-faint: #666666;
+      --btn-bg: #2a2a2a;
+      --btn-active: #333333;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); margin: 0; }
+  input, select, textarea {
+    background: var(--btn-bg) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  input::placeholder, textarea::placeholder { color: var(--text-faint) !important; }
+`;
+
 export default function App() {
   const [view, setView] = useState("standings");
   const [sortKey, setSortKey] = useState("total");
@@ -98,7 +146,6 @@ export default function App() {
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [loading, setLoading] = useState(true);
 
-  // Commissioner
   const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
@@ -174,7 +221,7 @@ export default function App() {
 
   const handleCommUnlock = () => {
     if (commPassword === COMM_PASSWORD) { setCommUnlocked(true); setCommError(false); }
-    else { setCommError(true); }
+    else setCommError(true);
   };
 
   const initWeekDraft = (w: number) => {
@@ -183,21 +230,17 @@ export default function App() {
     setWeekDrafts(d => ({ ...d, [w]: existing ? { teams: [...existing.teams], points: String(existing.points) } : { teams: [""], points: "" } }));
   };
 
-  const updateDraftTeam = (w: number, idx: number, val: string) => {
-    setWeekDrafts(d => { const draft = { ...d[w] }; const teams = [...draft.teams]; teams[idx] = val; return { ...d, [w]: { ...draft, teams } }; });
-  };
+  const updateDraftTeam = (w: number, idx: number, val: string) =>
+    setWeekDrafts(d => { const t = [...d[w].teams]; t[idx] = val; return { ...d, [w]: { ...d[w], teams: t } }; });
 
-  const addDraftTeam = (w: number) => {
-    setWeekDrafts(d => { const draft = { ...d[w] }; return { ...d, [w]: { ...draft, teams: [...draft.teams, ""] } }; });
-  };
+  const addDraftTeam = (w: number) =>
+    setWeekDrafts(d => ({ ...d, [w]: { ...d[w], teams: [...d[w].teams, ""] } }));
 
-  const removeDraftTeam = (w: number, idx: number) => {
-    setWeekDrafts(d => { const draft = { ...d[w] }; const teams = draft.teams.filter((_, i) => i !== idx); return { ...d, [w]: { ...draft, teams: teams.length ? teams : [""] } }; });
-  };
+  const removeDraftTeam = (w: number, idx: number) =>
+    setWeekDrafts(d => { const t = d[w].teams.filter((_, i) => i !== idx); return { ...d, [w]: { ...d[w], teams: t.length ? t : [""] } }; });
 
   const saveWeek = async (w: number) => {
     const draft = weekDrafts[w];
-    if (!draft) return;
     const teams = draft.teams.filter(t => t.trim());
     const points = parseFloat(draft.points);
     if (!teams.length || isNaN(points)) { alert("Fill in at least one team and a points total."); return; }
@@ -207,253 +250,270 @@ export default function App() {
     setWeekDrafts(d => { const nd = { ...d }; delete nd[w]; return nd; });
   };
 
+  const btn = (active = false): React.CSSProperties => ({
+    fontSize: 12, padding: "5px 12px", borderRadius: 6,
+    border: `1px solid ${C.border}`,
+    background: active ? C.btnActive : C.btnBg,
+    color: C.text, cursor: "pointer", fontWeight: active ? 600 : 400,
+  });
+
   const SortTh = ({ k, label, style = {} }: { k: string; label: string; style?: React.CSSProperties }) => {
     const active = sortKey === k;
     return (
-      <th onClick={() => handleSort(k)} style={{ textAlign: "right", padding: "6px 4px", fontWeight: active ? 600 : 400, minWidth: 34, fontSize: 11, color: active ? "#111" : "#888", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
+      <th onClick={() => handleSort(k)} style={{
+        textAlign: "right", padding: "6px 4px", fontWeight: active ? 600 : 400,
+        minWidth: 34, fontSize: 11, color: active ? C.text : C.textMuted,
+        cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style
+      }}>
         {label}{active ? (sortAsc ? " ↑" : " ↓") : ""}
       </th>
     );
   };
 
-  if (loading) return <div style={{ padding: 32, fontFamily: "sans-serif", color: "#888" }}>Loading...</div>;
+  if (loading) return (
+    <>
+      <style>{globalStyle}</style>
+      <div style={{ padding: 32, fontFamily: "system-ui, sans-serif", color: C.textMuted }}>Loading...</div>
+    </>
+  );
 
   return (
-    <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui, sans-serif", color: "#111" }}>
+    <>
+      <style>{globalStyle}</style>
+      <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui, sans-serif", color: C.text, background: C.bg, minHeight: "100vh" }}>
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Heavy Draft Ballers Weekly Prize Tracker</div>
-          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-            {lastUpdated ? `Last updated ${toEastern(lastUpdated)}` : "No data loaded yet"}
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: C.text }}>Heavy Draft Ballers Weekly Prize Tracker</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+              {lastUpdated ? `Last updated ${toEastern(lastUpdated)}` : "No data loaded yet"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {!editMode && ["standings", "breakdown", "history"].map(v => (
+              <button key={v} onClick={() => setView(v)} style={btn(view === v)}>
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </button>
+            ))}
+            <button onClick={() => { setEditMode(!editMode); setEditData(""); }} style={btn()}>
+              {editMode ? "Cancel" : "Update data"}
+            </button>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {["standings", "breakdown", "history"].map(v => (
-            <button key={v} onClick={() => setView(v)}
-              style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: view === v ? "#f0f0f0" : "white", color: "#111", cursor: "pointer", fontWeight: view === v ? 600 : 400 }}>
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-          <button onClick={() => { setEditMode(!editMode); setEditData(""); }}
-            style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", color: "#888", cursor: "pointer" }}>
-            {editMode ? "Cancel" : "Update data"}
-          </button>
-        </div>
-      </div>
 
-      {/* Edit panel */}
-      {editMode && (
-        <div style={{ marginBottom: 20, padding: 16, background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e5e5" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Paste from Yahoo Fantasy</div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Go to Stat Tracker → League Stats → Week Totals, then select all and paste below.</div>
-          <textarea value={editData} onChange={e => setEditData(e.target.value)} placeholder="Paste Yahoo table here..."
-            style={{ width: "100%", height: 180, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: "1px solid #ddd", padding: 8, boxSizing: "border-box", resize: "vertical" }} />
-          <button onClick={handleEditSave} style={{ marginTop: 8, fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "#111", color: "white", fontWeight: 500 }}>
-            Save & recalculate
-          </button>
-        </div>
-      )}
-
-      {/* Standings */}
-      {view === "standings" && (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24 }}>#</th>
-                <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160 }}>Team</th>
-                {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} />)}
-                <SortTh k="total" label="Total" style={{ minWidth: 46, padding: "6px 8px" }} />
-              </tr>
-            </thead>
-            <tbody>
-              {displayRows.map((t, i) => (
-                <tr key={t.name} style={{ borderBottom: "1px solid #f0f0f0" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                  <td style={{ padding: "8px 6px", color: "#aaa" }}>{i + 1}</td>
-                  <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}>{t.name}</td>
-                  {CATS.map(c => (
-                    <td key={c.key} style={{ padding: "8px 4px", textAlign: "right", fontWeight: sortKey === c.key ? 600 : 400 }}>
-                      {fmtPts(t.pts[c.key])}
-                    </td>
-                  ))}
-                  <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600 }}>{fmtPts(t.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Breakdown */}
-      {view === "breakdown" && (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24 }}>#</th>
-                <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160 }}>Team</th>
-                {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
-                <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
-              </tr>
-            </thead>
-            <tbody>
-              {displayRows.map((t, i) => (
-                <tr key={t.name} style={{ borderBottom: "1px solid #e5e5e5" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                  <td style={{ padding: "10px 6px", fontSize: 12, color: "#aaa", verticalAlign: "middle" }}>{i + 1}</td>
-                  <td style={{ padding: "10px 8px", fontSize: 13, fontWeight: 400, whiteSpace: "nowrap", verticalAlign: "middle" }}>{t.name}</td>
-                  {CATS.map(c => (
-                    <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle", background: sortKey === c.key ? "#fafafa" : "transparent" }}>
-                      <span style={{ display: "block", fontSize: 13, fontWeight: "bold" }}>{c.fmt(t[c.key as keyof Team] as number)}</span>
-                      <span style={{ display: "block", fontSize: 10, color: "#999", marginTop: 2 }}>{fmtPts(t.pts[c.key])} pts</span>
-                    </td>
-                  ))}
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle" }}>{fmtPts(t.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* History */}
-      {view === "history" && (
-        <div>
-          {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).some(w => weekWinners[w]) ? (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                  <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, width: 80 }}>Week</th>
-                  <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600 }}>Winner</th>
-                  <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 100 }}>Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
-                  const entry = weekWinners[w];
-                  if (!entry) return null;
-                  return (
-                    <tr key={w} style={{ borderBottom: "1px solid #f0f0f0" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                      <td style={{ padding: "10px 8px", color: "#888", fontWeight: 500 }}>Week {w}</td>
-                      <td style={{ padding: "10px 8px", fontWeight: 500 }}>
-                        {entry.teams.join(" & ")}
-                      </td>
-                      <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600 }}>{fmtPts(entry.points)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <div style={{ fontSize: 13, color: "#888", padding: "24px 0", textAlign: "center" }}>No weekly winners locked in yet.</div>
-          )}
-        </div>
-      )}
-
-      {/* Commissioner Tool */}
-      <div style={{ marginTop: 48, borderTop: "1px solid #f0f0f0", paddingTop: 24 }}>
-        <div style={{ fontSize: 11, color: "#ccc", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>Commissioner</div>
-
-        {!commUnlocked ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="password" placeholder="Password" value={commPassword}
-              onChange={e => setCommPassword(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleCommUnlock(); }}
-              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: `1px solid ${commError ? "#c00" : "#ddd"}`, width: 160 }} />
-            <button onClick={handleCommUnlock}
-              style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "white" }}>
-              Unlock
-            </button>
-            {commError && <span style={{ fontSize: 11, color: "#c00" }}>Incorrect password</span>}
+        {/* Edit panel — hides all other content */}
+        {editMode ? (
+          <div style={{ padding: 20, background: C.bgAlt, borderRadius: 8, border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: C.text }}>Paste from Yahoo Fantasy</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
+              Go to <strong>Stat Tracker → League Stats → Week Totals</strong>, select all and paste below.
+            </div>
+            <textarea value={editData} onChange={e => setEditData(e.target.value)} placeholder="Paste Yahoo table here..."
+              style={{ width: "100%", height: 200, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: `1px solid ${C.border}`, padding: 10, resize: "vertical", background: C.btnBg, color: C.text }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={handleEditSave} style={{ ...btn(), background: "#111", color: "#fff", fontWeight: 600, border: "none" }}>
+                Save & recalculate
+              </button>
+              <button onClick={() => { setEditMode(false); setEditData(""); }} style={btn()}>Cancel</button>
+            </div>
           </div>
         ) : (
-          <div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 16 }}>Select weekly winners. Use "+ Team" for ties.</div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 80 }}>Week</th>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Winner(s)</th>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 110 }}>Points</th>
-                  <th style={{ width: 80 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
-                  const locked = weekWinners[w];
-                  const draft = weekDrafts[w];
-                  const isEditing = !!draft;
-
-                  return (
-                    <tr key={w} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                      <td style={{ padding: "10px 8px", color: "#888", fontWeight: 500 }}>Week {w}</td>
-                      <td style={{ padding: "10px 8px" }}>
-                        {isEditing ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {draft.teams.map((t, idx) => (
-                              <div key={idx} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                <select value={t} onChange={e => updateDraftTeam(w, idx, e.target.value)}
-                                  style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", flex: 1 }}>
-                                  <option value="">— Select team —</option>
-                                  {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
-                                </select>
-                                {draft.teams.length > 1 && (
-                                  <button onClick={() => removeDraftTeam(w, idx)}
-                                    style={{ fontSize: 11, padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", color: "#c00", background: "white" }}>✕</button>
-                                )}
-                              </div>
-                            ))}
-                            <button onClick={() => addDraftTeam(w)}
-                              style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", background: "white", color: "#555", alignSelf: "flex-start", marginTop: 2 }}>
-                              + Team
-                            </button>
-                          </div>
-                        ) : (
-                          <span style={{ color: locked ? "#111" : "#ccc" }}>{locked ? locked.teams.join(" & ") : "—"}</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 8px" }}>
-                        {isEditing ? (
-                          <input type="number" value={draft.points} onChange={e => setWeekDrafts(d => ({ ...d, [w]: { ...d[w], points: e.target.value } }))}
-                            placeholder="pts" style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", width: 80 }} />
-                        ) : (
-                          <span style={{ color: locked ? "#111" : "#ccc" }}>{locked ? fmtPts(locked.points) : "—"}</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                        {isEditing ? (
-                          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                            <button onClick={() => saveWeek(w)}
-                              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", background: "#111", color: "white", fontWeight: 500 }}>Save</button>
-                            <button onClick={() => setWeekDrafts(d => { const nd = { ...d }; delete nd[w]; return nd; })}
-                              style={{ fontSize: 11, padding: "4px 8px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", background: "white" }}>✕</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => initWeekDraft(w)}
-                            style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", background: "white", color: "#555" }}>
-                            {locked ? "Edit" : "Set"}
-                          </button>
-                        )}
-                      </td>
+          <>
+            {/* Standings */}
+            {view === "standings" && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                      <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+                      {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} />)}
+                      <SortTh k="total" label="Total" style={{ minWidth: 46, padding: "6px 8px" }} />
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <button onClick={() => { setCommUnlocked(false); setCommPassword(""); }}
-              style={{ marginTop: 16, fontSize: 11, color: "#aaa", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-              Lock commissioner
-            </button>
-          </div>
+                  </thead>
+                  <tbody>
+                    {displayRows.map((t, i) => (
+                      <tr key={t.name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                        onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <td style={{ padding: "8px 6px", color: C.textFaint }}>{i + 1}</td>
+                        <td style={{ padding: "8px 8px", whiteSpace: "nowrap", color: C.text }}>{t.name}</td>
+                        {CATS.map(c => (
+                          <td key={c.key} style={{ padding: "8px 4px", textAlign: "right", fontWeight: sortKey === c.key ? 600 : 400, color: C.text }}>
+                            {fmtPts(t.pts[c.key])}
+                          </td>
+                        ))}
+                        <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: C.text }}>{fmtPts(t.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Breakdown */}
+            {view === "breakdown" && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                      <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+                      {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
+                      <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayRows.map((t, i) => (
+                      <tr key={t.name} style={{ borderBottom: `1px solid ${C.border}` }}
+                        onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <td style={{ padding: "10px 6px", fontSize: 12, color: C.textFaint, verticalAlign: "middle" }}>{i + 1}</td>
+                        <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
+                        {CATS.map(c => (
+                          <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
+                            <span style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>{c.fmt(t[c.key as keyof Team] as number)}</span>
+                            <span style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>{fmtPts(t.pts[c.key])} pts</span>
+                          </td>
+                        ))}
+                        <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* History */}
+            {view === "history" && (
+              <div>
+                {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).some(w => weekWinners[w]) ? (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                        <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, width: 80, color: C.text }}>Week</th>
+                        <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, color: C.text }}>Winner</th>
+                        <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 100, color: C.text }}>Points</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
+                        const entry = weekWinners[w];
+                        if (!entry) return null;
+                        return (
+                          <tr key={w} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                            onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                            <td style={{ padding: "10px 8px", color: C.textMuted, fontWeight: 500 }}>Week {w}</td>
+                            <td style={{ padding: "10px 8px", fontWeight: 500, color: C.text }}>{entry.teams.join(" & ")}</td>
+                            <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600, color: C.text }}>{fmtPts(entry.points)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0", textAlign: "center" }}>No weekly winners locked in yet.</div>
+                )}
+              </div>
+            )}
+          </>
         )}
+
+        {/* Commissioner Tool */}
+        <div style={{ marginTop: 48, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
+          <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>Commissioner</div>
+          {!commUnlocked ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="password" placeholder="Password" value={commPassword}
+                onChange={e => setCommPassword(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleCommUnlock(); }}
+                style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: `1px solid ${commError ? "#c00" : C.border}`, width: 160 }} />
+              <button onClick={handleCommUnlock} style={btn()}>Unlock</button>
+              {commError && <span style={{ fontSize: 11, color: "#c00" }}>Incorrect password</span>}
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Select weekly winners. Use "+ Team" for ties.</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                    <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 80, color: C.text }}>Week</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, color: C.text }}>Winner(s)</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 110, color: C.text }}>Points</th>
+                    <th style={{ width: 80 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
+                    const locked = weekWinners[w];
+                    const draft = weekDrafts[w];
+                    const isEditing = !!draft;
+                    return (
+                      <tr key={w} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                        <td style={{ padding: "10px 8px", color: C.textMuted, fontWeight: 500 }}>Week {w}</td>
+                        <td style={{ padding: "10px 8px" }}>
+                          {isEditing ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {draft.teams.map((t, idx) => (
+                                <div key={idx} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                  <select value={t} onChange={e => updateDraftTeam(w, idx, e.target.value)}
+                                    style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: `1px solid ${C.border}`, flex: 1 }}>
+                                    <option value="">— Select team —</option>
+                                    {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+                                  </select>
+                                  {draft.teams.length > 1 && (
+                                    <button onClick={() => removeDraftTeam(w, idx)}
+                                      style={{ fontSize: 11, padding: "3px 6px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", color: "#c00", background: C.btnBg }}>✕</button>
+                                  )}
+                                </div>
+                              ))}
+                              <button onClick={() => addDraftTeam(w)}
+                                style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", background: C.btnBg, color: C.textMuted, alignSelf: "flex-start", marginTop: 2 }}>
+                                + Team
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ color: locked ? C.text : C.textFaint }}>{locked ? locked.teams.join(" & ") : "—"}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 8px" }}>
+                          {isEditing ? (
+                            <input type="number" value={draft.points} onChange={e => setWeekDrafts(d => ({ ...d, [w]: { ...d[w], points: e.target.value } }))}
+                              placeholder="pts" style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: `1px solid ${C.border}`, width: 80 }} />
+                          ) : (
+                            <span style={{ color: locked ? C.text : C.textFaint }}>{locked ? fmtPts(locked.points) : "—"}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                          {isEditing ? (
+                            <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                              <button onClick={() => saveWeek(w)}
+                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "none", cursor: "pointer", background: "#111", color: "#fff", fontWeight: 500 }}>Save</button>
+                              <button onClick={() => setWeekDrafts(d => { const nd = { ...d }; delete nd[w]; return nd; })}
+                                style={{ fontSize: 11, padding: "4px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", background: C.btnBg, color: C.text }}>✕</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => initWeekDraft(w)}
+                              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", background: C.btnBg, color: C.textMuted }}>
+                              {locked ? "Edit" : "Set"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <button onClick={() => { setCommUnlocked(false); setCommPassword(""); }}
+                style={{ marginTop: 16, fontSize: 11, color: C.textFaint, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                Lock commissioner
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
