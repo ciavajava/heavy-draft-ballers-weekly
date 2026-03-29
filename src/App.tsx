@@ -15,27 +15,27 @@ const DEFAULT_DATA = [
   { name: "Maximum IL", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1 },
 ];
 
+const TOTAL_WEEKS = 22;
+const COMMISSIONER_PASSWORD = "maxmuncy";
+
 const CATS = [
-  { key: "r",    label: "R",    dir: 1,  fmt: (v: number) => v },
-  { key: "hr",   label: "HR",   dir: 1,  fmt: (v: number) => v },
-  { key: "rbi",  label: "RBI",  dir: 1,  fmt: (v: number) => v },
-  { key: "sb",   label: "SB",   dir: 1,  fmt: (v: number) => v },
+  { key: "r",    label: "R",    dir: 1,  fmt: (v: number) => String(v) },
+  { key: "hr",   label: "HR",   dir: 1,  fmt: (v: number) => String(v) },
+  { key: "rbi",  label: "RBI",  dir: 1,  fmt: (v: number) => String(v) },
+  { key: "sb",   label: "SB",   dir: 1,  fmt: (v: number) => String(v) },
   { key: "avg",  label: "AVG",  dir: 1,  fmt: (v: number) => v.toFixed(3).replace("0.", ".") },
   { key: "ops",  label: "OPS",  dir: 1,  fmt: (v: number) => v.toFixed(3).replace("0.", ".") },
-  { key: "w",    label: "W",    dir: 1,  fmt: (v: number) => v },
-  { key: "k",    label: "K",    dir: 1,  fmt: (v: number) => v },
+  { key: "w",    label: "W",    dir: 1,  fmt: (v: number) => String(v) },
+  { key: "k",    label: "K",    dir: 1,  fmt: (v: number) => String(v) },
   { key: "era",  label: "ERA",  dir: -1, fmt: (v: number) => v.toFixed(2) },
   { key: "whip", label: "WHIP", dir: -1, fmt: (v: number) => v.toFixed(2) },
-  { key: "qs",   label: "QS",   dir: 1,  fmt: (v: number) => v },
-  { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => v },
+  { key: "qs",   label: "QS",   dir: 1,  fmt: (v: number) => String(v) },
+  { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => String(v) },
 ];
 
 type Team = { name: string; r: number; hr: number; rbi: number; sb: number; avg: number; ops: number; w: number; k: number; era: number; whip: number; qs: number; svh: number; };
 type ScoredTeam = Team & { pts: Record<string, number>; total: number; };
-type WeekEntry = { week: number; lockedAt: string; snapshot: { rank: number; name: string; total: number; pts: Record<string, number> }[]; winner: string; winnerPts: number; };
-
-const STORAGE_KEY = "roto_weekly_history";
-const TEAMS_KEY = "roto_live_teams";
+type WeekResult = { week: number; teams: string[]; points: number; lockedAt: string; };
 
 function scoreCategory(teams: Team[], cat: typeof CATS[0]) {
   const n = teams.length;
@@ -64,7 +64,9 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
   }).sort((a, b) => b.total - a.total);
 }
 
-function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
+function fmtPts(v: number) { return Number.isInteger(v) ? String(v) : v.toFixed(1); }
+
+const TEAMS_KEY = "roto_live_teams";
 
 export default function App() {
   const [view, setView] = useState("standings");
@@ -73,31 +75,43 @@ export default function App() {
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState("");
   const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
-  const [weeklyHistory, setWeeklyHistory] = useState<WeekEntry[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
-  const [lockWeekNum, setLockWeekNum] = useState("");
-  const [lockConfirm, setLockConfirm] = useState(false);
+  const [weekResults, setWeekResults] = useState<(WeekResult | null)[]>(Array(TOTAL_WEEKS).fill(null));
   const [loading, setLoading] = useState(true);
 
+  // Commissioner state
+  const [commPassword, setCommPassword] = useState("");
+  const [commUnlocked, setCommUnlocked] = useState(false);
+  const [commError, setCommError] = useState(false);
+  const [draftWeeks, setDraftWeeks] = useState<{ teams: string[]; points: string }[]>(
+    Array.from({ length: TOTAL_WEEKS }, () => ({ teams: [""], points: "" }))
+  );
+
   useEffect(() => {
-    const loadData = async () => {
+    const load = async () => {
       try {
-        const [histRes, teamsRes] = await Promise.all([
-          fetch("/api/storage?key=" + STORAGE_KEY),
+        const [teamsRes, ...weekRes] = await Promise.all([
           fetch("/api/storage?key=" + TEAMS_KEY),
+          ...Array.from({ length: TOTAL_WEEKS }, (_, i) => fetch(`/api/storage?key=week:${i + 1}`)),
         ]);
-        if (histRes.ok) {
-          const h = await histRes.json();
-          if (h.value) { const parsed = JSON.parse(h.value); setWeeklyHistory(parsed); if (parsed.length) setSelectedWeek(parsed[parsed.length - 1].week); }
+        if (teamsRes.ok) { const t = await teamsRes.json(); if (t.value) setLiveTeams(JSON.parse(t.value)); }
+        const results: (WeekResult | null)[] = Array(TOTAL_WEEKS).fill(null);
+        const drafts = Array.from({ length: TOTAL_WEEKS }, () => ({ teams: [""], points: "" }));
+        for (let i = 0; i < TOTAL_WEEKS; i++) {
+          if (weekRes[i].ok) {
+            const w = await weekRes[i].json();
+            if (w.value) {
+              const parsed: WeekResult = JSON.parse(w.value);
+              results[i] = parsed;
+              drafts[i] = { teams: parsed.teams, points: String(parsed.points) };
+            }
+          }
         }
-        if (teamsRes.ok) {
-          const t = await teamsRes.json();
-          if (t.value) setLiveTeams(JSON.parse(t.value));
-        }
+        setWeekResults(results);
+        setDraftWeeks(drafts);
       } catch (e) { console.error(e); }
       setLoading(false);
     };
-    loadData();
+    load();
   }, []);
 
   const saveToKV = async (key: string, value: string) => {
@@ -134,11 +148,58 @@ export default function App() {
       await saveToKV(TEAMS_KEY, JSON.stringify(parsed));
       setEditMode(false);
     } else {
-      alert("Couldn't parse that — make sure you're pasting directly from the Yahoo stat tracker table.");
+      alert("Couldn't parse — paste directly from Yahoo stat tracker.");
     }
   };
 
+  const handleCommLogin = () => {
+    if (commPassword === COMMISSIONER_PASSWORD) { setCommUnlocked(true); setCommError(false); }
+    else { setCommError(true); }
+  };
+
+  const handleSaveWeek = async (weekIdx: number) => {
+    const draft = draftWeeks[weekIdx];
+    const validTeams = draft.teams.filter(t => t.trim() !== "");
+    const pts = parseFloat(draft.points);
+    if (validTeams.length === 0 || isNaN(pts)) { alert("Select at least one team and enter points."); return; }
+    const result: WeekResult = { week: weekIdx + 1, teams: validTeams, points: pts, lockedAt: new Date().toISOString() };
+    const newResults = [...weekResults];
+    newResults[weekIdx] = result;
+    setWeekResults(newResults);
+    await saveToKV(`week:${weekIdx + 1}`, JSON.stringify(result));
+  };
+
+  const handleClearWeek = async (weekIdx: number) => {
+    const newResults = [...weekResults];
+    newResults[weekIdx] = null;
+    setWeekResults(newResults);
+    const newDrafts = [...draftWeeks];
+    newDrafts[weekIdx] = { teams: [""], points: "" };
+    setDraftWeeks(newDrafts);
+    await saveToKV(`week:${weekIdx + 1}`, "");
+  };
+
+  const updateDraftTeam = (weekIdx: number, teamIdx: number, val: string) => {
+    const newDrafts = [...draftWeeks];
+    newDrafts[weekIdx] = { ...newDrafts[weekIdx], teams: newDrafts[weekIdx].teams.map((t, i) => i === teamIdx ? val : t) };
+    setDraftWeeks(newDrafts);
+  };
+
+  const addDraftTeam = (weekIdx: number) => {
+    const newDrafts = [...draftWeeks];
+    newDrafts[weekIdx] = { ...newDrafts[weekIdx], teams: [...newDrafts[weekIdx].teams, ""] };
+    setDraftWeeks(newDrafts);
+  };
+
+  const removeDraftTeam = (weekIdx: number, teamIdx: number) => {
+    const newDrafts = [...draftWeeks];
+    const teams = newDrafts[weekIdx].teams.filter((_, i) => i !== teamIdx);
+    newDrafts[weekIdx] = { ...newDrafts[weekIdx], teams: teams.length > 0 ? teams : [""] };
+    setDraftWeeks(newDrafts);
+  };
+
   const scored = computeRoto(liveTeams);
+  const teamNames = scored.map(t => t.name);
 
   const handleSort = (key: string) => {
     if (sortKey === key) setSortAsc(a => !a);
@@ -151,46 +212,26 @@ export default function App() {
     return sortAsc ? aVal - bVal : bVal - aVal;
   });
 
-  const handleLockWeek = async () => {
-    const wn = parseInt(lockWeekNum);
-    if (!wn || wn < 1) { alert("Enter a valid week number."); return; }
-    if (weeklyHistory.find(w => w.week === wn)) { alert(`Week ${wn} is already locked.`); return; }
-    const snapshot = scored.map((t, i) => ({ rank: i + 1, name: t.name, total: t.total, pts: { ...t.pts } }));
-    const entry: WeekEntry = { week: wn, lockedAt: new Date().toISOString(), snapshot, winner: snapshot[0].name, winnerPts: snapshot[0].total };
-    const newHistory = [...weeklyHistory, entry].sort((a, b) => a.week - b.week);
-    setWeeklyHistory(newHistory);
-    setSelectedWeek(wn);
-    await saveToKV(STORAGE_KEY, JSON.stringify(newHistory));
-    setLockWeekNum("");
-    setLockConfirm(false);
-  };
-
-  const handleDeleteWeek = async (wn: number) => {
-    const newHistory = weeklyHistory.filter(w => w.week !== wn);
-    setWeeklyHistory(newHistory);
-    setSelectedWeek(newHistory.length ? newHistory[newHistory.length - 1].week : null);
-    await saveToKV(STORAGE_KEY, JSON.stringify(newHistory));
-  };
-
-  const selectedEntry = weeklyHistory.find(w => w.week === selectedWeek);
-
   const SortTh = ({ k, label, style = {} }: { k: string; label: string; style?: React.CSSProperties }) => {
     const active = sortKey === k;
     return (
-      <th onClick={() => handleSort(k)} style={{ textAlign: "right", padding: "6px 4px", fontWeight: active ? 500 : 400, minWidth: 34, fontSize: 11, color: active ? "#111" : "#888", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
+      <th onClick={() => handleSort(k)} style={{ textAlign: "right", padding: "6px 4px", fontWeight: active ? 600 : 400, minWidth: 34, fontSize: 11, color: active ? "#111" : "#888", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
         {label}{active ? (sortAsc ? " ↑" : " ↓") : ""}
       </th>
     );
   };
+
+  const lockedCount = weekResults.filter(Boolean).length;
 
   if (loading) return <div style={{ padding: 32, fontFamily: "sans-serif", color: "#888" }}>Loading...</div>;
 
   return (
     <div style={{ padding: "24px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui, sans-serif", color: "#111" }}>
 
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>Heavy Draft Ballers Weekly</div>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>Heavy Draft Ballers Weekly</div>
           <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>12-cat roto · Week totals · {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -207,17 +248,19 @@ export default function App() {
         </div>
       </div>
 
+      {/* Edit panel */}
       {editMode && (
         <div style={{ marginBottom: 20, padding: 16, background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e5e5" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Paste directly from Yahoo stat tracker</div>
           <textarea value={editData} onChange={e => setEditData(e.target.value)} placeholder="Paste Yahoo table here..."
             style={{ width: "100%", height: 180, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: "1px solid #ddd", padding: 8, boxSizing: "border-box", resize: "vertical" }} />
-          <button onClick={handleEditSave} style={{ marginTop: 8, fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "#111", color: "white", fontWeight: 500 }}>
+          <button onClick={handleEditSave} style={{ marginTop: 8, fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer", background: "#111", color: "white", fontWeight: 600 }}>
             Save & recalculate
           </button>
         </div>
       )}
 
+      {/* Standings */}
       {view === "standings" && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -249,13 +292,14 @@ export default function App() {
         </div>
       )}
 
+      {/* Breakdown */}
       {view === "breakdown" && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24 }}>#</th>
-                <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160 }}>Team</th>
+                <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, fontSize: 12, width: 24 }}>#</th>
+                <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: 12, minWidth: 160 }}>Team</th>
                 {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
                 <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
               </tr>
@@ -281,84 +325,128 @@ export default function App() {
         </div>
       )}
 
+      {/* History */}
       {view === "history" && (
         <div>
-          <div style={{ marginBottom: 20, padding: 16, background: "#f9f9f9", borderRadius: 8, border: "1px solid #e5e5e5" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Lock current standings as a week snapshot</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <input type="number" min="1" placeholder="Week #" value={lockWeekNum} onChange={e => { setLockWeekNum(e.target.value); setLockConfirm(false); }}
-                style={{ width: 90, fontSize: 13, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd" }} />
-              {!lockConfirm ? (
-                <button onClick={() => { if (lockWeekNum) setLockConfirm(true); }}
-                  style={{ fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "white" }}>
-                  Lock week
-                </button>
-              ) : (
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "#888" }}>Lock Week {lockWeekNum}?</span>
-                  <button onClick={handleLockWeek} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "#111", color: "white", fontWeight: 500 }}>Confirm</button>
-                  <button onClick={() => setLockConfirm(false)} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer" }}>Cancel</button>
-                </div>
-              )}
-            </div>
+          <div style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+            {lockedCount} of {TOTAL_WEEKS} weeks locked
           </div>
-
-          {weeklyHistory.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#888", padding: "24px 0", textAlign: "center" }}>No weeks locked yet.</div>
+          {lockedCount === 0 ? (
+            <div style={{ fontSize: 13, color: "#aaa", padding: "32px 0", textAlign: "center" }}>No weeks locked yet — check back after Week 1.</div>
           ) : (
-            <>
-              <div style={{ fontSize: 11, color: "#888", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Weekly winners</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-                {weeklyHistory.map(w => (
-                  <div key={w.week} onClick={() => setSelectedWeek(w.week)}
-                    style={{ padding: "10px 14px", borderRadius: 8, border: selectedWeek === w.week ? "2px solid #111" : "1px solid #e5e5e5", background: "#fafafa", cursor: "pointer", minWidth: 130 }}>
-                    <div style={{ fontSize: 10, color: "#888", marginBottom: 4 }}>WEEK {w.week}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{w.winner}</div>
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{fmtPts(w.winnerPts)} pts</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              {weekResults.map((result, i) => result ? (
+                <div key={i} style={{ padding: "12px 16px", borderRadius: 8, border: "1px solid #e5e5e5", background: "#fafafa", minWidth: 140 }}>
+                  <div style={{ fontSize: 10, color: "#aaa", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" }}>Week {i + 1}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
+                    {result.teams.length === 1
+                      ? result.teams[0]
+                      : result.teams.map((t, ti) => <div key={ti}>{t}</div>)
+                    }
                   </div>
-                ))}
-              </div>
-
-              {selectedEntry && (
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>Week {selectedEntry.week} — Final Standings</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ fontSize: 11, color: "#888" }}>Locked {new Date(selectedEntry.lockedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                      <button onClick={() => handleDeleteWeek(selectedEntry.week)}
-                        style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", color: "#c00", background: "white" }}>Delete</button>
-                    </div>
-                  </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
-                        <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24 }}>#</th>
-                        <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160 }}>Team</th>
-                        {CATS.map(c => <th key={c.key} style={{ textAlign: "right", padding: "6px 4px", fontWeight: 400, fontSize: 11, color: "#888", minWidth: 34 }}>{c.label}</th>)}
-                        <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, minWidth: 46 }}>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedEntry.snapshot.map((t, i) => (
-                        <tr key={t.name} style={{ borderBottom: "1px solid #f0f0f0" }}
-                          onMouseEnter={e => (e.currentTarget.style.background = "#fafafa")}
-                          onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                          <td style={{ padding: "7px 6px", color: "#aaa" }}>{t.rank}</td>
-                          <td style={{ padding: "7px 8px", fontWeight: i < 3 ? 600 : 400, whiteSpace: "nowrap" }}>{t.name}</td>
-                          {CATS.map(c => <td key={c.key} style={{ padding: "7px 4px", textAlign: "right" }}>{fmtPts(t.pts[c.key])}</td>)}
-                          <td style={{ padding: "7px 8px", textAlign: "right", fontWeight: 600 }}>{fmtPts(t.total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{fmtPts(result.points)} pts{result.teams.length > 1 ? " (tie)" : ""}</div>
                 </div>
-              )}
-            </>
+              ) : null)}
+            </div>
           )}
         </div>
       )}
 
-      <div style={{ marginTop: 24, fontSize: 11, color: "#aaa" }}>
+      {/* Commissioner Tool */}
+      <div style={{ marginTop: 60, borderTop: "1px solid #e5e5e5", paddingTop: 24 }}>
+        <div style={{ fontSize: 11, color: "#ccc", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>Commissioner</div>
+
+        {!commUnlocked ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="password" placeholder="Password" value={commPassword}
+              onChange={e => setCommPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCommLogin()}
+              style={{ fontSize: 13, padding: "5px 10px", borderRadius: 6, border: `1px solid ${commError ? "#c00" : "#ddd"}`, width: 160 }} />
+            <button onClick={handleCommLogin}
+              style={{ fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "white" }}>
+              Unlock
+            </button>
+            {commError && <span style={{ fontSize: 12, color: "#c00" }}>Incorrect password</span>}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Weekly Winners</div>
+              <button onClick={() => setCommUnlocked(false)}
+                style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", color: "#888", background: "white" }}>
+                Lock
+              </button>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #e5e5e5" }}>
+                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 60 }}>Week</th>
+                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Winner(s)</th>
+                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 100 }}>Points</th>
+                  <th style={{ width: 120 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: TOTAL_WEEKS }, (_, i) => {
+                  const draft = draftWeeks[i];
+                  const locked = weekResults[i];
+                  return (
+                    <tr key={i} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                      <td style={{ padding: "8px 8px", color: "#888", fontWeight: 600 }}>Wk {i + 1}</td>
+                      <td style={{ padding: "8px 8px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {draft.teams.map((team, ti) => (
+                            <div key={ti} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                              <select value={team} onChange={e => updateDraftTeam(i, ti, e.target.value)}
+                                style={{ fontSize: 12, padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", flex: 1 }}>
+                                <option value="">— Select team —</option>
+                                {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                              {draft.teams.length > 1 && (
+                                <button onClick={() => removeDraftTeam(i, ti)}
+                                  style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", color: "#c00", background: "white" }}>✕</button>
+                              )}
+                            </div>
+                          ))}
+                          <button onClick={() => addDraftTeam(i)}
+                            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", color: "#555", background: "white", alignSelf: "flex-start", marginTop: 2 }}>
+                            + Add team (tie)
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px 8px", verticalAlign: "top" }}>
+                        <input type="number" value={draft.points} onChange={e => {
+                          const newDrafts = [...draftWeeks];
+                          newDrafts[i] = { ...newDrafts[i], points: e.target.value };
+                          setDraftWeeks(newDrafts);
+                        }}
+                          placeholder="pts" style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", width: 70 }} />
+                      </td>
+                      <td style={{ padding: "8px 8px", textAlign: "right", verticalAlign: "top" }}>
+                        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                          <button onClick={() => handleSaveWeek(i)}
+                            style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "none", cursor: "pointer", background: "#111", color: "white", fontWeight: 600 }}>
+                            {locked ? "Update" : "Save"}
+                          </button>
+                          {locked && (
+                            <button onClick={() => handleClearWeek(i)}
+                              style={{ fontSize: 11, padding: "4px 8px", borderRadius: 4, border: "1px solid #ddd", cursor: "pointer", color: "#c00", background: "white" }}>
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        {locked && <div style={{ fontSize: 10, color: "#aaa", marginTop: 4, textAlign: "right" }}>Saved</div>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 24, fontSize: 11, color: "#ccc" }}>
         12-team roto · R HR RBI SB AVG OPS W K ERA WHIP QS SVH · Ties split points
       </div>
     </div>
