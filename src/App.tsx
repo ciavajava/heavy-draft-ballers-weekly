@@ -61,16 +61,17 @@ const WEEK_SCHEDULE = [
   { week: 25, start: "Sep 14", end: "Sep 20" },
 ];
 
+const WEEK_STARTS = [
+  "2026-03-25","2026-03-30","2026-04-06","2026-04-13","2026-04-20",
+  "2026-04-27","2026-05-04","2026-05-11","2026-05-18","2026-05-25",
+  "2026-06-01","2026-06-08","2026-06-15","2026-06-22","2026-06-29",
+  "2026-07-06","2026-07-13","2026-07-27","2026-08-03","2026-08-10",
+  "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
+];
+
 function getCurrentWeek() {
-  const weekStarts = [
-    "2026-03-25","2026-03-30","2026-04-06","2026-04-13","2026-04-20",
-    "2026-04-27","2026-05-04","2026-05-11","2026-05-18","2026-05-25",
-    "2026-06-01","2026-06-08","2026-06-15","2026-06-22","2026-06-29",
-    "2026-07-06","2026-07-13","2026-07-27","2026-08-03","2026-08-10",
-    "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
-  ];
   const now = new Date();
-  const idx = weekStarts.reduce((acc, d, i) => new Date(d) <= now ? i : acc, 0);
+  const idx = WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= now ? i : acc, 0);
   return WEEK_SCHEDULE[idx];
 }
 
@@ -153,7 +154,6 @@ export default function App() {
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [loading, setLoading] = useState(true);
 
-  // Commissioner
   const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
@@ -300,7 +300,16 @@ export default function App() {
     );
   };
 
-  if (loading) return (<><style>{globalStyle}</style><div style={{ padding: 32, fontFamily: "system-ui,sans-serif", color: C.textMuted }}>Loading...</div></>);
+  const cw = getCurrentWeek();
+
+  if (loading) {
+    return (
+      <>
+        <style>{globalStyle}</style>
+        <div style={{ padding: 32, fontFamily: "system-ui,sans-serif", color: C.textMuted }}>Loading...</div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -314,12 +323,9 @@ export default function App() {
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
               {lastUpdated ? `Last updated ${toEastern(lastUpdated)}` : "No data loaded yet"}
             </div>
-            {(() => { const w = getCurrentWeek(); return (
-              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-                Week {w.week} · {w.start} – {w.end}{w.note ? ` (${w.note})` : ""}
-              </div>
-            ); })()}
-          </div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+              Week {cw.week} · {cw.start} – {cw.end}{cw.note ? ` (${cw.note})` : ""}
+            </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["standings", "breakdown", "history"].map(v => (
@@ -444,8 +450,7 @@ export default function App() {
             </div>
           ) : (
             <div>
-              {/* Section tabs */}
-              <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
                 {(["history", "sync", "manual"] as const).map(s => (
                   <button key={s} onClick={() => setCommSection(s)} style={btn(commSection === s)}>
                     {s === "history" ? "Weekly History" : s === "sync" ? "Sync Now" : "Manual Override"}
@@ -457,7 +462,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* History section */}
               {commSection === "history" && (
                 <div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Set weekly winners. Use "+ Team" for ties. All weeks are editable.</div>
@@ -532,7 +536,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Sync section */}
               {commSection === "sync" && (
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual Yahoo sync</div>
@@ -549,7 +552,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Manual override section */}
               {commSection === "manual" && (
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual data override</div>
