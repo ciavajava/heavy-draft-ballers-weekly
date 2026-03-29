@@ -33,6 +33,47 @@ const CATS = [
 const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 
+const WEEK_SCHEDULE = [
+  { week: 1,  start: "Mar 25", end: "Mar 29" },
+  { week: 2,  start: "Mar 30", end: "Apr 5" },
+  { week: 3,  start: "Apr 6",  end: "Apr 12" },
+  { week: 4,  start: "Apr 13", end: "Apr 19" },
+  { week: 5,  start: "Apr 20", end: "Apr 26" },
+  { week: 6,  start: "Apr 27", end: "May 3" },
+  { week: 7,  start: "May 4",  end: "May 10" },
+  { week: 8,  start: "May 11", end: "May 17" },
+  { week: 9,  start: "May 18", end: "May 24" },
+  { week: 10, start: "May 25", end: "May 31" },
+  { week: 11, start: "Jun 1",  end: "Jun 7" },
+  { week: 12, start: "Jun 8",  end: "Jun 14" },
+  { week: 13, start: "Jun 15", end: "Jun 21" },
+  { week: 14, start: "Jun 22", end: "Jun 28" },
+  { week: 15, start: "Jun 29", end: "Jul 5" },
+  { week: 16, start: "Jul 6",  end: "Jul 12" },
+  { week: 17, start: "Jul 13", end: "Jul 26", note: "All-Star break" },
+  { week: 18, start: "Jul 27", end: "Aug 2" },
+  { week: 19, start: "Aug 3",  end: "Aug 9" },
+  { week: 20, start: "Aug 10", end: "Aug 16" },
+  { week: 21, start: "Aug 17", end: "Aug 23" },
+  { week: 22, start: "Aug 24", end: "Aug 30" },
+  { week: 23, start: "Aug 31", end: "Sep 6" },
+  { week: 24, start: "Sep 7",  end: "Sep 13" },
+  { week: 25, start: "Sep 14", end: "Sep 20" },
+];
+
+function getCurrentWeek() {
+  const weekStarts = [
+    "2026-03-25","2026-03-30","2026-04-06","2026-04-13","2026-04-20",
+    "2026-04-27","2026-05-04","2026-05-11","2026-05-18","2026-05-25",
+    "2026-06-01","2026-06-08","2026-06-15","2026-06-22","2026-06-29",
+    "2026-07-06","2026-07-13","2026-07-27","2026-08-03","2026-08-10",
+    "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
+  ];
+  const now = new Date();
+  const idx = weekStarts.reduce((acc, d, i) => new Date(d) <= now ? i : acc, 0);
+  return WEEK_SCHEDULE[idx];
+}
+
 type Team = { name: string; r: number; hr: number; rbi: number; sb: number; avg: number; ops: number; w: number; k: number; era: number; whip: number; qs: number; svh: number };
 type ScoredTeam = Team & { pts: Record<string, number>; total: number };
 type WeekWinner = { week: number; teams: string[]; points: number };
@@ -273,6 +314,12 @@ export default function App() {
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
               {lastUpdated ? `Last updated ${toEastern(lastUpdated)}` : "No data loaded yet"}
             </div>
+            {(() => { const w = getCurrentWeek(); return (
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                Week {w.week} · {w.start} – {w.end}{w.note ? ` (${w.note})` : ""}
+              </div>
+            ); })()}
+          </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["standings", "breakdown", "history"].map(v => (
