@@ -17,18 +17,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return new Response(JSON.stringify({ error: "Missing credentials in KV" }), { status: 500 });
   }
 
-  const credentials = btoa(`${clientId}:${clientSecret}`);
-
   const tokenRes = await fetch("https://api.login.yahoo.com/oauth2/get_token", {
     method: "POST",
     headers: {
-      "Authorization": `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
       redirect_uri: `${url.origin}/api/yahoo-auth`,
+      client_id: clientId,
+      client_secret: clientSecret,
     }).toString(),
   });
 
