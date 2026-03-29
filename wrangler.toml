@@ -5,3 +5,4 @@ pages_build_output_dir = "./dist"
 [[kv_namespaces]]
 binding = "ROTO_KV"
 id = "defa4da54e5f4601a894154eceffafc1"
+preview_id = "2d25a10224fe436c9b2fdecf8cf6eba8"
