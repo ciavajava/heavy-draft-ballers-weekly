@@ -165,19 +165,23 @@ export default function App() {
   const [manualResult, setManualResult] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    const load = async (initial = false) => {
       const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
       if (teamsVal) setLiveTeams(JSON.parse(teamsVal));
       if (tsVal) setLastUpdated(tsVal);
-      const ww: Record<number, WeekWinner> = {};
-      await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
-        const val = await kvGet(WEEK_PREFIX + w);
-        if (val) ww[w] = JSON.parse(val);
-      }));
-      setWeekWinners(ww);
-      setLoading(false);
+      if (initial) {
+        const ww: Record<number, WeekWinner> = {};
+        await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
+          const val = await kvGet(WEEK_PREFIX + w);
+          if (val) ww[w] = JSON.parse(val);
+        }));
+        setWeekWinners(ww);
+        setLoading(false);
+      }
     };
-    load();
+    load(true);
+    const interval = setInterval(() => load(false), 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const scored = computeRoto(liveTeams);
