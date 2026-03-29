@@ -4,4 +4,4 @@ pages_build_output_dir = "./dist"
 
 [[kv_namespaces]]
 binding = "ROTO_KV"
-id = "PLACEHOLDER"
+id = "defa4da54e5f4601a894154eceffafc1"
