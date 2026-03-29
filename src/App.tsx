@@ -24,8 +24,8 @@ const CATS = [
   { key: "ops",  label: "OPS",  dir: 1,  fmt: (v: number) => v.toFixed(3).replace("0.", ".") },
   { key: "w",    label: "W",    dir: 1,  fmt: (v: number) => v },
   { key: "k",    label: "K",    dir: 1,  fmt: (v: number) => v },
-  { key: "era",  label: "ERA",  dir: -1, fmt: (v: number) => v.toFixed(2) },
-  { key: "whip", label: "WHIP", dir: -1, fmt: (v: number) => v.toFixed(2) },
+  { key: "era",  label: "ERA",  dir: -1, fmt: (v: number) => v.toFixed(3) },
+  { key: "whip", label: "WHIP", dir: -1, fmt: (v: number) => v.toFixed(3) },
   { key: "qs",   label: "QS",   dir: 1,  fmt: (v: number) => v },
   { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => v },
 ];
@@ -113,7 +113,7 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
 function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
 
 function toEastern(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) + " ET";
 }
 
 async function kvGet(key: string) {
