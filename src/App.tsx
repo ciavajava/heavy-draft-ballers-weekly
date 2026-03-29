@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const DEFAULT_DATA = [
   { name: "RL's Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3 },
@@ -138,19 +138,19 @@ const C = {
 };
 
 const globalStyle = `
-  :root { --bg:#ffffff;--bg-alt:#f9f9f9;--border:#e5e5e5;--border-light:#f0f0f0;--text:#111111;--text-muted:#666666;--text-faint:#aaaaaa;--btn-bg:#ffffff;--btn-active:#f0f0f0; }
+  :root{--bg:#ffffff;--bg-alt:#f9f9f9;--border:#e5e5e5;--border-light:#f0f0f0;--text:#111111;--text-muted:#666666;--text-faint:#aaaaaa;--btn-bg:#ffffff;--btn-active:#f0f0f0;}
   @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg-alt:#242424;--border:#333333;--border-light:#2a2a2a;--text:#f0f0f0;--text-muted:#aaaaaa;--text-faint:#666666;--btn-bg:#2a2a2a;--btn-active:#333333;}}
   *{box-sizing:border-box;} body{background:var(--bg);color:var(--text);margin:0;}
   input,select,textarea{background:var(--btn-bg)!important;color:var(--text)!important;border-color:var(--border)!important;}
   input::placeholder,textarea::placeholder{color:var(--text-faint)!important;}
-  @keyframes flashBgGreen { 0%{background:#d4f7d4;} 100%{background:transparent;} }
-  @keyframes flashBgRed   { 0%{background:#fdd;} 100%{background:transparent;} }
-  @keyframes flashTxtGreen { 0%{color:#1a7a1a;} 100%{color:inherit;} }
-  @keyframes flashTxtRed   { 0%{color:#c00;} 100%{color:inherit;} }
-  .flash-bg-up   { animation: flashBgGreen 1.5s ease-out forwards; }
-  .flash-bg-down { animation: flashBgRed   1.5s ease-out forwards; }
-  .flash-txt-up   { animation: flashTxtGreen 1.5s ease-out forwards; }
-  .flash-txt-down { animation: flashTxtRed   1.5s ease-out forwards; }
+  @keyframes flashBgGreen{0%{background:#d4f7d4;}100%{background:transparent;}}
+  @keyframes flashBgRed{0%{background:#fdd;}100%{background:transparent;}}
+  @keyframes flashTxtGreen{0%{color:#1a7a1a;}100%{color:inherit;}}
+  @keyframes flashTxtRed{0%{color:#c00;}100%{color:inherit;}}
+  .flash-bg-up{animation:flashBgGreen 1.5s ease-out forwards;}
+  .flash-bg-down{animation:flashBgRed 1.5s ease-out forwards;}
+  .flash-txt-up{animation:flashTxtGreen 1.5s ease-out forwards;}
+  .flash-txt-down{animation:flashTxtRed 1.5s ease-out forwards;}
 `;
 
 export default function App() {
@@ -161,47 +161,11 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [loading, setLoading] = useState(true);
-
-  const [prevTeams, setPrevTeams] = useState<Record<string, any>>({});
   const [flashMap, setFlashMap] = useState<Record<string, string>>({});
+  const prevScoredRef = useRef<ScoredTeam[]>([]);
+  const prevTeamsRef = useRef<Record<string, Team>>({});
 
-  const triggerFlash = (newTeams: Team[], oldTeams: Record<string, any>) => {
-    const flashes: Record<string, string> = {};
-    const newScored = computeRoto(newTeams);
-    const oldScored = oldTeams.scored as ScoredTeam[] | undefined;
-
-    newTeams.forEach(t => {
-      const old = oldTeams[t.name];
-      if (!old) return;
-      CATS.forEach(c => {
-        const statKey = `${t.name}__stat__${c.key}`;
-        const newVal = (t as any)[c.key];
-        const oldVal = old[c.key];
-        if (newVal !== oldVal) {
-          const improved = c.dir === 1 ? newVal > oldVal : newVal < oldVal;
-          flashes[statKey] = improved ? "flash-txt-up" : "flash-txt-down";
-        }
-      });
-    });
-
-    if (oldScored) {
-      newScored.forEach(t => {
-        const oldT = oldScored.find(o => o.name === t.name);
-        if (!oldT) return;
-        CATS.forEach(c => {
-          const ptsKey = `${t.name}__pts__${c.key}`;
-          if (t.pts[c.key] !== oldT.pts[c.key]) {
-            flashes[ptsKey] = t.pts[c.key] > oldT.pts[c.key] ? "flash-bg-up" : "flash-bg-down";
-          }
-        });
-      });
-    }
-
-    if (Object.keys(flashes).length > 0) {
-      setFlashMap(flashes);
-      setTimeout(() => setFlashMap({}), 1600);
-    }
-  };
+  const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
   const [commSection, setCommSection] = useState<"history" | "sync" | "manual">("history");
@@ -211,28 +175,53 @@ export default function App() {
   const [manualData, setManualData] = useState("");
   const [manualResult, setManualResult] = useState<string | null>(null);
 
+  const triggerFlash = (newTeams: Team[]) => {
+    const oldTeams = prevTeamsRef.current;
+    const oldScored = prevScoredRef.current;
+    if (!Object.keys(oldTeams).length) return;
+
+    const newScored = computeRoto(newTeams);
+    const flashes: Record<string, string> = {};
+
+    newTeams.forEach(t => {
+      const old = oldTeams[t.name];
+      if (!old) return;
+      CATS.forEach(c => {
+        const newVal = (t as any)[c.key];
+        const oldVal = (old as any)[c.key];
+        if (newVal !== oldVal) {
+          const improved = c.dir === 1 ? newVal > oldVal : newVal < oldVal;
+          flashes[`${t.name}__stat__${c.key}`] = improved ? "flash-txt-up" : "flash-txt-down";
+        }
+      });
+    });
+
+    newScored.forEach(t => {
+      const oldT = oldScored.find(o => o.name === t.name);
+      if (!oldT) return;
+      CATS.forEach(c => {
+        if (t.pts[c.key] !== oldT.pts[c.key]) {
+          flashes[`${t.name}__pts__${c.key}`] = t.pts[c.key] > oldT.pts[c.key] ? "flash-bg-up" : "flash-bg-down";
+        }
+      });
+    });
+
+    if (Object.keys(flashes).length > 0) {
+      setFlashMap(flashes);
+      setTimeout(() => setFlashMap({}), 1600);
+    }
+  };
+
   useEffect(() => {
     const load = async (initial = false) => {
       const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
       if (teamsVal) {
-        const newTeams = JSON.parse(teamsVal);
-        if (!initial) {
-          setPrevTeams(prev => {
-            triggerFlash(newTeams, prev);
-            return prev;
-          });
-          setPrevTeams(prev => {
-            const map: Record<string, any> = {};
-            newTeams.forEach((t: Team) => { map[t.name] = t; });
-            map.scored = computeRoto(newTeams);
-            return map;
-          });
-        } else {
-          const map: Record<string, any> = {};
-          newTeams.forEach((t: Team) => { map[t.name] = t; });
-          map.scored = computeRoto(newTeams);
-          setPrevTeams(map);
-        }
+        const newTeams: Team[] = JSON.parse(teamsVal);
+        if (!initial) triggerFlash(newTeams);
+        const newMap: Record<string, Team> = {};
+        newTeams.forEach(t => { newMap[t.name] = t; });
+        prevTeamsRef.current = newMap;
+        prevScoredRef.current = computeRoto(newTeams);
         setLiveTeams(newTeams);
       }
       if (tsVal) setLastUpdated(tsVal);
@@ -460,8 +449,12 @@ export default function App() {
                     <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
                     {CATS.map(c => (
                       <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
-                        <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>{c.fmt(t[c.key as keyof Team] as number)}</span>
-                        <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>{fmtPts(t.pts[c.key])} pts</span>
+                        <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>
+                          {c.fmt(t[c.key as keyof Team] as number)}
+                        </span>
+                        <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
+                          {fmtPts(t.pts[c.key])} pts
+                        </span>
                       </td>
                     ))}
                     <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
@@ -611,7 +604,7 @@ export default function App() {
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual Yahoo sync</div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
-                    The app auto-syncs from Yahoo every 5 minutes between 1pm–1am ET. Use this to force an immediate update.
+                    The app auto-syncs from Yahoo every 5 minutes. Use this to force an immediate update.
                   </div>
                   <button onClick={handleSync} disabled={syncing}
                     style={{ fontSize: 13, padding: "8px 20px", borderRadius: 6, border: "none", cursor: syncing ? "not-allowed" : "pointer", background: "#111", color: "#fff", fontWeight: 500, opacity: syncing ? 0.6 : 1 }}>
@@ -627,7 +620,7 @@ export default function App() {
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual data override</div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
-                    The app auto-syncs from Yahoo every 5 minutes between 1pm–1am ET on game days, and locks each week automatically on Monday at 2:45am ET. Use this only as a fallback if the auto-sync is unavailable.
+                    The app auto-syncs from Yahoo every 5 minutes and locks each week automatically on Monday at 2:45am ET. Use this only as a fallback if the auto-sync is unavailable.
                   </div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
                     To get the data: Yahoo Fantasy → Stat Tracker → League Stats → set to <strong>Week Totals</strong> → select all → copy → paste below.
