@@ -6,3 +6,10 @@ pages_build_output_dir = "./dist"
 binding = "ROTO_KV"
 id = "defa4da54e5f4601a894154eceffafc1"
 preview_id = "2d25a10224fe436c9b2fdecf8cf6eba8"
+
+[triggers]
+crons = [
+  "*/5 18-23 * * *",
+  "*/5 0-6 * * *",
+  "45 7 * * 1"
+]
