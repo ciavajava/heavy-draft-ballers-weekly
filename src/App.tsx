@@ -32,6 +32,7 @@ const CATS = [
 
 const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
+const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
 
 const WEEK_SCHEDULE = [
   { week: 1,  start: "Mar 25", end: "Mar 29" },
@@ -69,17 +70,24 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-function getCurrentWeek() {
-  // Don't flip to new week until Monday 7:45am UTC (2:45am EST) — matches auto-lock time
+function getCurrentWeekNum() {
   const now = new Date();
   const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
-  const idx = WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i : acc, 0);
-  return WEEK_SCHEDULE[idx];
+  return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
+}
+
+function getCurrentWeek() {
+  return WEEK_SCHEDULE[getCurrentWeekNum() - 1];
+}
+
+function getCompletedWeeks() {
+  const current = getCurrentWeekNum();
+  return WEEK_SCHEDULE.filter(w => w.week < current);
 }
 
 type Team = { name: string; r: number; hr: number; rbi: number; sb: number; avg: number; ops: number; w: number; k: number; era: number; whip: number; qs: number; svh: number };
 type ScoredTeam = Team & { pts: Record<string, number>; total: number };
-type WeekWinner = { week: number; teams: string[]; points: number };
+type WeekWinner = { week: number; teams: string[]; points: number; finalized?: boolean };
 
 const TEAMS_KEY = "roto_live_teams";
 const TIMESTAMP_KEY = "roto_last_updated";
@@ -132,16 +140,16 @@ async function kvSet(key: string, value: string) {
 }
 
 const C = {
-  bg: "var(--bg, #ffffff)", bgAlt: "var(--bg-alt, #f9f9f9)",
-  border: "var(--border, #e5e5e5)", borderLight: "var(--border-light, #f0f0f0)",
-  text: "var(--text, #111111)", textMuted: "var(--text-muted, #666666)",
-  textFaint: "var(--text-faint, #aaaaaa)", btnBg: "var(--btn-bg, #ffffff)",
-  btnActive: "var(--btn-active, #f0f0f0)",
+  bg: "var(--bg,#fff)", bgAlt: "var(--bg-alt,#f9f9f9)",
+  border: "var(--border,#e5e5e5)", borderLight: "var(--border-light,#f0f0f0)",
+  text: "var(--text,#111)", textMuted: "var(--text-muted,#666)",
+  textFaint: "var(--text-faint,#aaa)", btnBg: "var(--btn-bg,#fff)",
+  btnActive: "var(--btn-active,#f0f0f0)",
 };
 
 const globalStyle = `
-  :root{--bg:#ffffff;--bg-alt:#f9f9f9;--border:#e5e5e5;--border-light:#f0f0f0;--text:#111111;--text-muted:#666666;--text-faint:#aaaaaa;--btn-bg:#ffffff;--btn-active:#f0f0f0;}
-  @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg-alt:#242424;--border:#333333;--border-light:#2a2a2a;--text:#f0f0f0;--text-muted:#aaaaaa;--text-faint:#666666;--btn-bg:#2a2a2a;--btn-active:#333333;}}
+  :root{--bg:#fff;--bg-alt:#f9f9f9;--border:#e5e5e5;--border-light:#f0f0f0;--text:#111;--text-muted:#666;--text-faint:#aaa;--btn-bg:#fff;--btn-active:#f0f0f0;}
+  @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg-alt:#242424;--border:#333;--border-light:#2a2a2a;--text:#f0f0f0;--text-muted:#aaa;--text-faint:#666;--btn-bg:#2a2a2a;--btn-active:#333;}}
   *{box-sizing:border-box;} body{background:var(--bg);color:var(--text);margin:0;}
   input,select,textarea{background:var(--btn-bg)!important;color:var(--text)!important;border-color:var(--border)!important;}
   input::placeholder,textarea::placeholder{color:var(--text-faint)!important;}
@@ -155,8 +163,67 @@ const globalStyle = `
   .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
 `;
 
+function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
+  teams: ScoredTeam[];
+  sortKey: string;
+  sortAsc: boolean;
+  onSort: (k: string) => void;
+  flashMap?: Record<string, string>;
+}) {
+  const SortTh = ({ k, label, style = {} }: { k: string; label: string; style?: React.CSSProperties }) => {
+    const active = sortKey === k;
+    return (
+      <th onClick={() => onSort(k)} style={{ textAlign: "right", padding: "6px 4px", fontWeight: active ? 600 : 400, minWidth: 34, fontSize: 11, color: active ? C.text : C.textMuted, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
+        {label}{active ? (sortAsc ? " ↑" : " ↓") : ""}
+      </th>
+    );
+  };
+
+  const displayRows = [...teams].sort((a, b) => {
+    const aVal = sortKey === "total" ? a.total : a.pts[sortKey];
+    const bVal = sortKey === "total" ? b.total : b.pts[sortKey];
+    return sortAsc ? aVal - bVal : bVal - aVal;
+  });
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+            <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
+            <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+            {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
+            <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((t, i) => (
+            <tr key={t.name} style={{ borderBottom: `1px solid ${C.border}` }}
+              onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <td style={{ padding: "10px 6px", fontSize: 12, color: C.textFaint, verticalAlign: "middle" }}>{i + 1}</td>
+              <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
+              {CATS.map(c => (
+                <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
+                  <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>
+                    {c.fmt(t[c.key as keyof Team] as number)}
+                  </span>
+                  <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
+                    {fmtPts(t.pts[c.key])} pts
+                  </span>
+                </td>
+              ))}
+              <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function App() {
-  const [view, setView] = useState("standings");
+  const [view, setView] = useState<"current" | "previous" | "winners">("current");
   const [sortKey, setSortKey] = useState("total");
   const [sortAsc, setSortAsc] = useState(false);
   const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
@@ -167,6 +234,13 @@ export default function App() {
   const prevScoredRef = useRef<ScoredTeam[]>([]);
   const prevTeamsRef = useRef<Record<string, Team>>({});
 
+  // Previous weeks
+  const [selectedPrevWeek, setSelectedPrevWeek] = useState<number | null>(null);
+  const [prevWeekTeams, setPrevWeekTeams] = useState<ScoredTeam[] | null>(null);
+  const [prevWeekLoading, setPrevWeekLoading] = useState(false);
+  const [prevWeekError, setPrevWeekError] = useState<string | null>(null);
+
+  // Commissioner
   const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
@@ -181,10 +255,8 @@ export default function App() {
     const oldTeams = prevTeamsRef.current;
     const oldScored = prevScoredRef.current;
     if (!Object.keys(oldTeams).length) return;
-
     const newScored = computeRoto(newTeams);
     const flashes: Record<string, string> = {};
-
     newTeams.forEach(t => {
       const old = oldTeams[t.name];
       if (!old) return;
@@ -197,7 +269,6 @@ export default function App() {
         }
       });
     });
-
     newScored.forEach(t => {
       const oldT = oldScored.find(o => o.name === t.name);
       if (!oldT) return;
@@ -207,7 +278,6 @@ export default function App() {
         }
       });
     });
-
     if (Object.keys(flashes).length > 0) {
       setFlashMap(flashes);
       setTimeout(() => setFlashMap({}), 3100);
@@ -245,19 +315,34 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const loadPrevWeek = async (weekNum: number) => {
+    setSelectedPrevWeek(weekNum);
+    setPrevWeekTeams(null);
+    setPrevWeekError(null);
+    setPrevWeekLoading(true);
+    try {
+      const res = await fetch(`${WORKER_URL}?week=${weekNum}`);
+      const data = await res.json() as any;
+      if (data.ok) {
+        setPrevWeekTeams(computeRoto(data.teams));
+      } else {
+        setPrevWeekError(data.error || "Failed to load week data");
+      }
+    } catch (e: any) {
+      setPrevWeekError(e.message);
+    }
+    setPrevWeekLoading(false);
+  };
+
   const scored = computeRoto(liveTeams);
   const teamNames = scored.map(t => t.name);
+  const completedWeeks = getCompletedWeeks();
+  const cw = getCurrentWeek();
 
   const handleSort = (key: string) => {
     if (sortKey === key) setSortAsc(a => !a);
     else { setSortKey(key); setSortAsc(false); }
   };
-
-  const displayRows = [...scored].sort((a, b) => {
-    const aVal = sortKey === "total" ? a.total : a.pts[sortKey];
-    const bVal = sortKey === "total" ? b.total : b.pts[sortKey];
-    return sortAsc ? aVal - bVal : bVal - aVal;
-  });
 
   const parseYahooPaste = (raw: string): Team[] => {
     const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
@@ -301,7 +386,7 @@ export default function App() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const res = await fetch("https://roto-sync-worker.eciavardini.workers.dev");
+      const res = await fetch(WORKER_URL);
       const data = await res.json() as any;
       if (data.ok) {
         const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
@@ -356,25 +441,7 @@ export default function App() {
     cursor: "pointer", fontWeight: active ? 600 : 400,
   });
 
-  const SortTh = ({ k, label, style = {} }: { k: string; label: string; style?: React.CSSProperties }) => {
-    const active = sortKey === k;
-    return (
-      <th onClick={() => handleSort(k)} style={{ textAlign: "right", padding: "6px 4px", fontWeight: active ? 600 : 400, minWidth: 34, fontSize: 11, color: active ? C.text : C.textMuted, cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
-        {label}{active ? (sortAsc ? " ↑" : " ↓") : ""}
-      </th>
-    );
-  };
-
-  const cw = getCurrentWeek();
-
-  if (loading) {
-    return (
-      <>
-        <style>{globalStyle}</style>
-        <div style={{ padding: 32, fontFamily: "system-ui,sans-serif", color: C.textMuted }}>Loading...</div>
-      </>
-    );
-  }
+  if (loading) return (<><style>{globalStyle}</style><div style={{ padding: 32, fontFamily: "system-ui,sans-serif", color: C.textMuted }}>Loading...</div></>);
 
   return (
     <>
@@ -393,85 +460,56 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {["standings", "breakdown", "history"].map(v => (
+            {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Winners"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} style={btn(view === v)}>
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Standings */}
-        {view === "standings" && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-                  <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
-                  {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} />)}
-                  <SortTh k="total" label="Total" style={{ minWidth: 46, padding: "6px 8px" }} />
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((t, i) => (
-                  <tr key={t.name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
-                    onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    <td style={{ padding: "8px 6px", color: C.textFaint }}>{i + 1}</td>
-                    <td style={{ padding: "8px 8px", whiteSpace: "nowrap", color: C.text }}>{t.name}</td>
-                    {CATS.map(c => (
-                      <td key={c.key} style={{ padding: "8px 4px", textAlign: "right", fontWeight: sortKey === c.key ? 600 : 400, color: C.text }}>
-                        {fmtPts(t.pts[c.key])}
-                      </td>
+        {/* Current Week */}
+        {view === "current" && (
+          <BreakdownTable teams={scored} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} flashMap={flashMap} />
+        )}
+
+        {/* Previous Weeks */}
+        {view === "previous" && (
+          <div>
+            {completedWeeks.length === 0 ? (
+              <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0", textAlign: "center" }}>No completed weeks yet.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                  <select value={selectedPrevWeek ?? ""} onChange={e => loadPrevWeek(parseInt(e.target.value))}
+                    style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 160 }}>
+                    <option value="">Select a week</option>
+                    {completedWeeks.map(w => (
+                      <option key={w.week} value={w.week}>Week {w.week} · {w.start} – {w.end}</option>
                     ))}
-                    <td style={{ padding: "8px 8px", textAlign: "right", fontWeight: 600, color: C.text }}>{fmtPts(t.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </select>
+                  {weekWinners[selectedPrevWeek!] && (
+                    <span style={{ fontSize: 12, color: C.textMuted }}>
+                      Winner: <strong style={{ color: C.text }}>{weekWinners[selectedPrevWeek!].teams.join(" & ")}</strong>
+                      {weekWinners[selectedPrevWeek!].finalized
+                        ? <span style={{ marginLeft: 8, fontSize: 11, color: "green" }}>✓ Final</span>
+                        : <span style={{ marginLeft: 8, fontSize: 11, color: "#ba7517" }}>· Pending finalization</span>}
+                    </span>
+                  )}
+                </div>
+
+                {prevWeekLoading && <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0" }}>Loading week data from Yahoo...</div>}
+                {prevWeekError && <div style={{ fontSize: 13, color: "#c00", padding: "12px 0" }}>Error: {prevWeekError}</div>}
+                {prevWeekTeams && !prevWeekLoading && (
+                  <BreakdownTable teams={prevWeekTeams} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                )}
+              </>
+            )}
           </div>
         )}
 
-        {/* Breakdown */}
-        {view === "breakdown" && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-                  <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
-                  {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
-                  <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((t, i) => (
-                  <tr key={t.name} style={{ borderBottom: `1px solid ${C.border}` }}
-                    onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                    <td style={{ padding: "10px 6px", fontSize: 12, color: C.textFaint, verticalAlign: "middle" }}>{i + 1}</td>
-                    <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
-                    {CATS.map(c => (
-                      <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
-                        <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>
-                          {c.fmt(t[c.key as keyof Team] as number)}
-                        </span>
-                        <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
-                          {fmtPts(t.pts[c.key])} pts
-                        </span>
-                      </td>
-                    ))}
-                    <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* History */}
-        {view === "history" && (
+        {/* Winners */}
+        {view === "winners" && (
           <div>
             {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).some(w => weekWinners[w]) ? (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -480,6 +518,7 @@ export default function App() {
                     <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, width: 80, color: C.text }}>Week</th>
                     <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, color: C.text }}>Winner</th>
                     <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 100, color: C.text }}>Points</th>
+                    <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 80, color: C.text }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -493,6 +532,11 @@ export default function App() {
                         <td style={{ padding: "10px 8px", color: C.textMuted, fontWeight: 500 }}>Week {w}</td>
                         <td style={{ padding: "10px 8px", fontWeight: 500, color: C.text }}>{entry.teams.join(" & ")}</td>
                         <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600, color: C.text }}>{fmtPts(entry.points)}</td>
+                        <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                          {entry.finalized
+                            ? <span style={{ fontSize: 11, color: "green" }}>✓ Final</span>
+                            : <span style={{ fontSize: 11, color: "#ba7517" }}>Pending</span>}
+                        </td>
                       </tr>
                     );
                   })}
@@ -615,9 +659,7 @@ export default function App() {
                     style={{ fontSize: 13, padding: "8px 20px", borderRadius: 6, border: "none", cursor: syncing ? "not-allowed" : "pointer", background: "#111", color: "#fff", fontWeight: 500, opacity: syncing ? 0.6 : 1 }}>
                     {syncing ? "Syncing..." : "Sync now"}
                   </button>
-                  {syncResult && (
-                    <div style={{ marginTop: 12, fontSize: 12, color: syncResult.startsWith("✓") ? "green" : "#c00" }}>{syncResult}</div>
-                  )}
+                  {syncResult && <div style={{ marginTop: 12, fontSize: 12, color: syncResult.startsWith("✓") ? "green" : "#c00" }}>{syncResult}</div>}
                 </div>
               )}
 
@@ -639,9 +681,7 @@ export default function App() {
                     </button>
                     <button onClick={() => { setManualData(""); setManualResult(null); }} style={btn()}>Clear</button>
                   </div>
-                  {manualResult && (
-                    <div style={{ marginTop: 10, fontSize: 12, color: manualResult.startsWith("✓") ? "green" : "#c00" }}>{manualResult}</div>
-                  )}
+                  {manualResult && <div style={{ marginTop: 10, fontSize: 12, color: manualResult.startsWith("✓") ? "green" : "#c00" }}>{manualResult}</div>}
                 </div>
               )}
             </div>
