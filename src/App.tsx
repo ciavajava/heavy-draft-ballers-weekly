@@ -70,8 +70,10 @@ const WEEK_STARTS = [
 ];
 
 function getCurrentWeek() {
+  // Don't flip to new week until Monday 7:45am UTC (2:45am EST) — matches auto-lock time
   const now = new Date();
-  const idx = WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= now ? i : acc, 0);
+  const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
+  const idx = WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i : acc, 0);
   return WEEK_SCHEDULE[idx];
 }
 
