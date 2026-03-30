@@ -147,10 +147,10 @@ const globalStyle = `
   @keyframes flashBgRed{0%{background:#fdd;}100%{background:transparent;}}
   @keyframes flashTxtGreen{0%{color:#1a7a1a;}100%{color:inherit;}}
   @keyframes flashTxtRed{0%{color:#c00;}100%{color:inherit;}}
-  .flash-bg-up{animation:flashBgGreen 1.5s ease-out forwards;}
-  .flash-bg-down{animation:flashBgRed 1.5s ease-out forwards;}
-  .flash-txt-up{animation:flashTxtGreen 1.5s ease-out forwards;}
-  .flash-txt-down{animation:flashTxtRed 1.5s ease-out forwards;}
+  .flash-bg-up{animation:flashBgGreen 3s ease-out forwards;}
+  .flash-bg-down{animation:flashBgRed 3s ease-out forwards;}
+  .flash-txt-up{animation:flashTxtGreen 3s ease-out forwards;}
+  .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
 `;
 
 export default function App() {
@@ -208,16 +208,19 @@ export default function App() {
 
     if (Object.keys(flashes).length > 0) {
       setFlashMap(flashes);
-      setTimeout(() => setFlashMap({}), 1600);
+      setTimeout(() => setFlashMap({}), 3100);
     }
   };
+
+  const triggerFlashRef = useRef(triggerFlash);
+  useEffect(() => { triggerFlashRef.current = triggerFlash; });
 
   useEffect(() => {
     const load = async (initial = false) => {
       const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
       if (teamsVal) {
         const newTeams: Team[] = JSON.parse(teamsVal);
-        if (!initial) triggerFlash(newTeams);
+        if (!initial) triggerFlashRef.current(newTeams);
         const newMap: Record<string, Team> = {};
         newTeams.forEach(t => { newMap[t.name] = t; });
         prevTeamsRef.current = newMap;
