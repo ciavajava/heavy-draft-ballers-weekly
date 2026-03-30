@@ -455,9 +455,6 @@ export default function App() {
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
               {lastUpdated ? `Last updated ${toEastern(lastUpdated)}` : "No data loaded yet"}
             </div>
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-              Week {cw.week} · {cw.start} – {cw.end}{cw.note ? ` (${cw.note})` : ""}
-            </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Winners"]] as const).map(([v, label]) => (
@@ -470,7 +467,12 @@ export default function App() {
 
         {/* Current Week */}
         {view === "current" && (
-          <BreakdownTable teams={scored} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} flashMap={flashMap} />
+          <>
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
+              Week {cw.week} · {cw.start} – {cw.end}{cw.note ? ` (${cw.note})` : ""}
+            </div>
+            <BreakdownTable teams={scored} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} flashMap={flashMap} />
+          </>
         )}
 
         {/* Previous Weeks */}
