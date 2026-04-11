@@ -235,4 +235,309 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
-          <tr style={{ borderBottom: `
+          <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+            <th style={{ textAlign: "left", padding: "6px 6px", fontWeight: 600, width: 24, color: C.text }}>#</th>
+            <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+            {CATS.map(c => <SortTh key={c.key} k={c.key} label={c.label} style={{ minWidth: 52 }} />)}
+            <SortTh k="total" label="Total" style={{ minWidth: 52, padding: "6px 8px" }} />
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((t, i) => (
+            <tr key={t.name} style={{ borderBottom: `1px solid ${C.border}` }}
+              onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <td style={{ padding: "10px 6px", fontSize: 12, color: C.textFaint, verticalAlign: "middle" }}>{i + 1}</td>
+              <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
+              {CATS.map(c => (
+                <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
+                  <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>
+                    {c.fmt(t[c.key as keyof Team] as number)}
+                  </span>
+                  <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
+                    {fmtPts(t.pts[c.key])} pts
+                  </span>
+                </td>
+              ))}
+              <td style={{ padding: "10px 8px", textAlign: "right", fontSize: 14, fontWeight: 600, verticalAlign: "middle", color: C.text }}>{fmtPts(t.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
+  liveScored: ScoredTeam[];
+  snapshots: Record<number, Record<string, number>>;
+  currentWeekNum: number;
+}) {
+  const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
+  const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
+
+  const liveScores: Record<string, number> = {};
+  liveScored.forEach(t => { liveScores[t.name] = t.total; });
+
+  const allTeamNames = liveScored.map(t => t.name);
+
+  const seasonTotals: Record<string, number> = {};
+  allTeamNames.forEach(name => {
+    let total = 0;
+    completedWeekNums.forEach(w => {
+      const snap = snapshots[w];
+      if (snap && snap[name] != null) total += snap[name];
+    });
+    if (liveScores[name] != null) total += liveScores[name];
+    seasonTotals[name] = total;
+  });
+
+  const sortedTeams = [...allTeamNames].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
+
+  const weekHighScores: Record<number, number> = {};
+  completedWeekNums.forEach(w => {
+    const snap = snapshots[w];
+    if (!snap) return;
+    weekHighScores[w] = Math.max(...Object.values(snap));
+  });
+
+  const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
+
+  let kingScore = 0;
+  let kingTeam = "";
+  let kingWeek = 0;
+  completedWeekNums.forEach(w => {
+    const snap = snapshots[w];
+    if (!snap) return;
+    Object.entries(snap).forEach(([name, pts]) => {
+      if (pts > kingScore) { kingScore = pts; kingTeam = name; kingWeek = w; }
+    });
+  });
+
+  const seasonLeader = sortedTeams[0];
+  const seasonLeaderTotal = seasonTotals[seasonLeader] ?? 0;
+  const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
+
+  return (
+    <div>
+      {/* Two-panel banner */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        {/* King of the hill */}
+        {kingTeam && (
+          <div style={{
+            flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 16px", borderRadius: 8,
+            background: "#fffbeb", border: "1px solid #f59e0b",
+          }}>
+            <span style={{ fontSize: 20 }}>👑</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#b45309" }}>One-Week Score to Beat</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                {kingTeam} — <span style={{ color: "#b45309" }}>{fmtPts(kingScore)} pts</span>
+                <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted, marginLeft: 8 }}>Week {kingWeek}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Season leader */}
+        {seasonLeader && (
+          <div style={{
+            flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 16px", borderRadius: 8,
+            background: "#f0fdf4", border: "1px solid #86efac",
+          }}>
+            <span style={{ fontSize: 20 }}>🏆</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d" }}>Season Total Leader</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                {seasonLeader} — <span style={{ color: "#15803d" }}>{fmtPts(seasonLeaderTotal)} pts</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#d97706", opacity: 0.85 }} />
+          Week winner (final)
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#3b82f6", opacity: 0.7 }} />
+          Current week leader
+        </div>
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+              <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1 }}>Team</th>
+              {/* Season total column with light grey background */}
+              <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap", background: "var(--bg-alt,#f9f9f9)" }}>Season Total</th>
+              {visibleWeeks.map(w => {
+                const isCurrentWeek = w === currentWeekNum;
+                const isFuture = w > currentWeekNum;
+                const sched = WEEK_SCHEDULE[w - 1];
+                return (
+                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap" }}>
+                    {isCurrentWeek && <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>}
+                    <div>Wk {w}</div>
+                    {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedTeams.map((name, idx) => {
+              return (
+                <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                  onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  {/* Left-justified team name, no star */}
+                  <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text, textAlign: "left" }}>
+                    <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
+                    <span>{name}</span>
+                  </td>
+                  {/* Season total cell with grey background */}
+                  <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>
+                    {fmtPts(seasonTotals[name] ?? 0)}
+                  </td>
+                  {visibleWeeks.map(w => {
+                    const isCurrentWeek = w === currentWeekNum;
+                    const isFuture = w > currentWeekNum;
+                    const snap = snapshots[w];
+                    const score = isCurrentWeek ? liveScores[name] : snap?.[name];
+                    const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
+                    const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
+
+                    let cellBg = "transparent";
+                    let cellColor = C.text;
+                    let cellWeight: React.CSSProperties["fontWeight"] = 400;
+                    // Green for confirmed week winners, blue for current week leader
+                    if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
+                    else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
+
+                    return (
+                      <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: isFuture ? C.textFaint : cellColor, fontWeight: cellWeight }}>
+                        {isFuture
+                          ? <span style={{ color: C.textFaint }}>—</span>
+                          : score != null
+                            ? <>{isWeekHigh ? "💰 " : ""}{fmtPts(score)}</>
+                            : <span style={{ color: C.textFaint }}>—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState<"current" | "previous" | "winners">("current");
+  const [sortKey, setSortKey] = useState("total");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
+  const [snapshots, setSnapshots] = useState<Record<number, Record<string, number>>>({});
+  const [loading, setLoading] = useState(true);
+  const [flashMap, setFlashMap] = useState<Record<string, string>>({});
+  const prevScoredRef = useRef<ScoredTeam[]>([]);
+  const prevTeamsRef = useRef<Record<string, Team>>({});
+
+  const [selectedPrevWeek, setSelectedPrevWeek] = useState<number | null>(null);
+  const [prevWeekTeams, setPrevWeekTeams] = useState<ScoredTeam[] | null>(null);
+  const [prevWeekLoading, setPrevWeekLoading] = useState(false);
+  const [prevWeekError, setPrevWeekError] = useState<string | null>(null);
+
+  const [commUnlocked, setCommUnlocked] = useState(false);
+  const [commPassword, setCommPassword] = useState("");
+  const [commError, setCommError] = useState(false);
+  const [commSection, setCommSection] = useState<"history" | "sync" | "manual">("history");
+  const [weekDrafts, setWeekDrafts] = useState<Record<number, { teams: string[]; points: string }>>({});
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [manualData, setManualData] = useState("");
+  const [manualResult, setManualResult] = useState<string | null>(null);
+
+  const currentWeekNum = getCurrentWeekNum();
+
+  const triggerFlash = (newTeams: Team[]) => {
+    const oldTeams = prevTeamsRef.current;
+    const oldScored = prevScoredRef.current;
+    if (!Object.keys(oldTeams).length) return;
+    const newScored = computeRoto(newTeams);
+    const flashes: Record<string, string> = {};
+    newTeams.forEach(t => {
+      const old = oldTeams[t.name];
+      if (!old) return;
+      CATS.forEach(c => {
+        const newVal = (t as any)[c.key];
+        const oldVal = (old as any)[c.key];
+        if (newVal !== oldVal) {
+          const improved = c.dir === 1 ? newVal > oldVal : newVal < oldVal;
+          flashes[`${t.name}__stat__${c.key}`] = improved ? "flash-txt-up" : "flash-txt-down";
+        }
+      });
+    });
+    newScored.forEach(t => {
+      const oldT = oldScored.find(o => o.name === t.name);
+      if (!oldT) return;
+      CATS.forEach(c => {
+        if (t.pts[c.key] !== oldT.pts[c.key]) {
+          flashes[`${t.name}__pts__${c.key}`] = t.pts[c.key] > oldT.pts[c.key] ? "flash-bg-up" : "flash-bg-down";
+        }
+      });
+    });
+    if (Object.keys(flashes).length > 0) {
+      setFlashMap(flashes);
+      setTimeout(() => setFlashMap({}), 3100);
+    }
+  };
+
+  const triggerFlashRef = useRef(triggerFlash);
+  useEffect(() => { triggerFlashRef.current = triggerFlash; });
+
+  useEffect(() => {
+    const load = async (initial = false) => {
+      const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
+      if (teamsVal) {
+        const newTeams: Team[] = JSON.parse(teamsVal);
+        if (!initial) triggerFlashRef.current(newTeams);
+        const newMap: Record<string, Team> = {};
+        newTeams.forEach(t => { newMap[t.name] = t; });
+        prevTeamsRef.current = newMap;
+        prevScoredRef.current = computeRoto(newTeams);
+        setLiveTeams(newTeams);
+
+        if (initial) {
+          const realNames = newTeams.map(t => t.name);
+          const seeded = buildSeededSnapshots(realNames);
+          const ww: Record<number, WeekWinner> = {};
+          const snaps: Record<number, Record<string, number>> = { ...seeded };
+          await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
+            const [val, snapVal] = await Promise.all([
+              kvGet(WEEK_PREFIX + w),
+              kvGet(`${SNAPSHOT_PREFIX}${w}_snapshot`),
+            ]);
+            if (val) ww[w] = JSON.parse(val);
+            if (snapVal) {
+              const parsed = JSON.parse(snapVal);
+              snaps[w] = parsed.scores ?? parsed;
+            }
+          }));
+          setWeekWinners(ww);
+          setSnapshots(snaps);
+          setLoading(false);
+        }
+      } else if (initial) {
+        setLoading(false);
+      }
