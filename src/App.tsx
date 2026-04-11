@@ -70,19 +70,20 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-const H2H_STANDINGS = [
-  { name: "Clever Name Here",            w: 24, l: 11, t: 1 },
-  { name: "RL's Some Stars",             w: 22, l: 12, t: 2 },
-  { name: "Uptown Finest",               w: 19, l: 13, t: 4 },
-  { name: "Buudy Mac's Dry Run",         w: 18, l: 15, t: 3 },
-  { name: "Albert's Pujol",              w: 16, l: 15, t: 5 },
-  { name: "Jim Leyland's Lungs",         w: 17, l: 16, t: 3 },
-  { name: "Cleveland Streamers",         w: 16, l: 16, t: 4 },
-  { name: "Squeaky Green Beans",         w: 16, l: 17, t: 3 },
-  { name: "Big League Chew-pacabras",    w: 15, l: 18, t: 3 },
-  { name: "Contreras to popular belief", w: 15, l: 19, t: 2 },
-  { name: "Acuña Matata",               w: 13, l: 19, t: 4 },
-  { name: "Maximum IL",                  w: 7,  l: 27, t: 2 },
+// Fallback hardcoded standings used until KV data is available
+const FALLBACK_H2H: H2HTeam[] = [
+  { name: "Clever Name Here",            w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
+  { name: "RL's Some Stars",             w: 22, l: 12, t: 2, winPct: 0.639, gb: 2 },
+  { name: "Uptown Finest",               w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5 },
+  { name: "Buudy Mac's Dry Run",         w: 18, l: 15, t: 3, winPct: 0.542, gb: 6 },
+  { name: "Albert's Pujol",              w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5 },
+  { name: "Jim Leyland's Lungs",         w: 17, l: 16, t: 3, winPct: 0.514, gb: 7 },
+  { name: "Cleveland Streamers",         w: 16, l: 16, t: 4, winPct: 0.500, gb: 8 },
+  { name: "Squeaky Green Beans",         w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5 },
+  { name: "Big League Chew-pacabras",    w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5 },
+  { name: "Contreras to popular belief", w: 15, l: 19, t: 2, winPct: 0.444, gb: 10 },
+  { name: "Acuña Matata",               w: 13, l: 19, t: 4, winPct: 0.417, gb: 11 },
+  { name: "Maximum IL",                  w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17 },
 ];
 
 const SIDEPOT1_TEAMS = new Set([
@@ -127,6 +128,8 @@ const SEEDED_SNAPSHOT_NAMES: Record<number, string[]> = {
   ],
 };
 
+type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
+
 function buildSeededSnapshots(liveNames: string[]): Record<number, Record<string, number>> {
   const result: Record<number, Record<string, number>> = {};
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
@@ -163,6 +166,7 @@ const TEAMS_KEY = "roto_live_teams";
 const TIMESTAMP_KEY = "roto_last_updated";
 const WEEK_PREFIX = "roto_week_";
 const SNAPSHOT_PREFIX = "roto_week_";
+const H2H_KEY = "roto_h2h_standings";
 
 function scoreCategory(teams: Team[], cat: typeof CATS[0]) {
   const n = teams.length;
@@ -193,6 +197,8 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
 
 function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
 function fmtMoney(v: number) { return v > 0 ? `$${v}` : "—"; }
+function fmtPct(v: number) { return v.toFixed(3).replace("0.", "."); }
+function fmtGb(v: number) { return v === 0 ? "—" : Number.isInteger(v) ? String(v) : v.toFixed(1); }
 
 function toEastern(iso: string) {
   return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) + " ET";
@@ -236,11 +242,8 @@ const globalStyle = `
 `;
 
 function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
-  teams: ScoredTeam[];
-  sortKey: string;
-  sortAsc: boolean;
-  onSort: (k: string) => void;
-  flashMap?: Record<string, string>;
+  teams: ScoredTeam[]; sortKey: string; sortAsc: boolean;
+  onSort: (k: string) => void; flashMap?: Record<string, string>;
 }) {
   const SortTh = ({ k, label, style = {} }: { k: string; label: string; style?: React.CSSProperties }) => {
     const active = sortKey === k;
@@ -250,13 +253,11 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
       </th>
     );
   };
-
   const displayRows = [...teams].sort((a, b) => {
     const aVal = sortKey === "total" ? a.total : a.pts[sortKey];
     const bVal = sortKey === "total" ? b.total : b.pts[sortKey];
     return sortAsc ? aVal - bVal : bVal - aVal;
   });
-
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -295,9 +296,7 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
 }
 
 function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
-  liveScored: ScoredTeam[];
-  snapshots: Record<number, Record<string, number>>;
-  currentWeekNum: number;
+  liveScored: ScoredTeam[]; snapshots: Record<number, Record<string, number>>; currentWeekNum: number;
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
@@ -323,7 +322,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
   const seasonLeader = sortedTeams[0];
   const seasonLeaderTotal = seasonTotals[seasonLeader] ?? 0;
   const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
-
   return (
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -363,9 +361,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                 const sched = WEEK_SCHEDULE[w - 1];
                 return (
                   <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap", verticalAlign: "top" }}>
-                    {isCurrentWeek
-                      ? <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>
-                      : <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>}
+                    {isCurrentWeek ? <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div> : <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>}
                     <div>Wk {w}</div>
                     {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
                   </th>
@@ -382,9 +378,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                   <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
                   <span>{name}</span>
                 </td>
-                <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>
-                  {fmtPts(seasonTotals[name] ?? 0)}
-                </td>
+                <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>{fmtPts(seasonTotals[name] ?? 0)}</td>
                 {visibleWeeks.map(w => {
                   const isCurrentWeek = w === currentWeekNum;
                   const isFuture = w > currentWeekNum;
@@ -412,11 +406,8 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 }
 
 function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
-  rows: { name: string; w: number; l: number; t: number; rank: number }[];
-  prizes: Record<number, number>;
-  accentColor: string;
-  accentBg: string;
-  showPlayoff: boolean;
+  rows: { name: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number }[];
+  prizes: Record<number, number>; accentColor: string; accentBg: string; showPlayoff: boolean;
 }) {
   return (
     <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
@@ -425,6 +416,8 @@ function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
           <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 28, color: C.text }}>#</th>
           <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
           <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L-T</th>
+          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L%</th>
+          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>GB</th>
           {showPlayoff && <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>Playoffs</th>}
           <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: accentColor, background: accentBg }}>Proj. Winnings</th>
         </tr>
@@ -441,6 +434,8 @@ function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
               <td style={{ padding: "10px 8px", color: C.textFaint, fontSize: 12 }}>{team.rank}</td>
               <td style={{ padding: "10px 8px", fontWeight: prize > 0 ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>{team.name}</td>
               <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted }}>{team.w}-{team.l}-{team.t}</td>
+              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted }}>{fmtPct(team.winPct)}</td>
+              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textFaint }}>{fmtGb(team.gb)}</td>
               {showPlayoff && (
                 <td style={{ padding: "10px 8px", textAlign: "center" }}>
                   {hasBye
@@ -479,14 +474,18 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, accentBg
   );
 }
 
-function StandingsTab() {
-  const sorted = [...H2H_STANDINGS].sort((a, b) => b.w - a.w || b.t - a.t);
-  const allRows = sorted.map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp1Rows = sorted.filter(t => SIDEPOT1_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp2Rows = sorted.filter(t => SIDEPOT2_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
+function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: string | null }) {
+  const allRows = h2h.map((t, i) => ({ ...t, rank: i + 1 }));
+  const sp1Rows = h2h.filter(t => SIDEPOT1_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
+  const sp2Rows = h2h.filter(t => SIDEPOT2_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
 
   return (
     <div>
+      {h2hUpdatedAt && (
+        <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 16 }}>
+          H2H standings last synced {toEastern(h2hUpdatedAt)}
+        </div>
+      )}
       <PotSection
         title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
         emoji="🏆" borderColor="#86efac" accentColor="#15803d" accentBg="rgba(240,253,244,0.8)"
@@ -520,12 +519,13 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [snapshots, setSnapshots] = useState<Record<number, Record<string, number>>>({});
+  const [h2h, setH2h] = useState<H2HTeam[]>(FALLBACK_H2H);
+  const [h2hUpdatedAt, setH2hUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [flashMap, setFlashMap] = useState<Record<string, string>>({});
   const prevScoredRef = useRef<ScoredTeam[]>([]);
   const prevTeamsRef = useRef<Record<string, Team>>({});
 
-  // Weekly detail — null = current week, number = previous week
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [prevWeekTeams, setPrevWeekTeams] = useState<ScoredTeam[] | null>(null);
   const [prevWeekLoading, setPrevWeekLoading] = useState(false);
@@ -552,11 +552,9 @@ export default function App() {
     const newScored = computeRoto(newTeams);
     const flashes: Record<string, string> = {};
     newTeams.forEach(t => {
-      const old = oldTeams[t.name];
-      if (!old) return;
+      const old = oldTeams[t.name]; if (!old) return;
       CATS.forEach(c => {
-        const newVal = (t as any)[c.key];
-        const oldVal = (old as any)[c.key];
+        const newVal = (t as any)[c.key], oldVal = (old as any)[c.key];
         if (newVal !== oldVal) {
           const improved = c.dir === 1 ? newVal > oldVal : newVal < oldVal;
           flashes[`${t.name}__stat__${c.key}`] = improved ? "flash-txt-up" : "flash-txt-down";
@@ -564,18 +562,13 @@ export default function App() {
       });
     });
     newScored.forEach(t => {
-      const oldT = oldScored.find(o => o.name === t.name);
-      if (!oldT) return;
+      const oldT = oldScored.find(o => o.name === t.name); if (!oldT) return;
       CATS.forEach(c => {
-        if (t.pts[c.key] !== oldT.pts[c.key]) {
+        if (t.pts[c.key] !== oldT.pts[c.key])
           flashes[`${t.name}__pts__${c.key}`] = t.pts[c.key] > oldT.pts[c.key] ? "flash-bg-up" : "flash-bg-down";
-        }
       });
     });
-    if (Object.keys(flashes).length > 0) {
-      setFlashMap(flashes);
-      setTimeout(() => setFlashMap({}), 3100);
-    }
+    if (Object.keys(flashes).length > 0) { setFlashMap(flashes); setTimeout(() => setFlashMap({}), 3100); }
   };
 
   const triggerFlashRef = useRef(triggerFlash);
@@ -583,7 +576,10 @@ export default function App() {
 
   useEffect(() => {
     const load = async (initial = false) => {
-      const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
+      const [teamsVal, tsVal, h2hVal] = await Promise.all([
+        kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY), kvGet(H2H_KEY),
+      ]);
+
       if (teamsVal) {
         const newTeams: Team[] = JSON.parse(teamsVal);
         if (!initial) triggerFlashRef.current(newTeams);
@@ -609,7 +605,17 @@ export default function App() {
       } else if (initial) {
         setLoading(false);
       }
+
       if (tsVal) setLastUpdated(tsVal);
+
+      // Load H2H standings from KV, fall back to hardcoded if not yet available
+      if (h2hVal) {
+        const parsed = JSON.parse(h2hVal);
+        if (parsed.standings?.length) {
+          setH2h(parsed.standings);
+          setH2hUpdatedAt(parsed.updatedAt ?? null);
+        }
+      }
     };
     load(true);
     const interval = setInterval(() => load(false), 5 * 60 * 1000);
@@ -618,14 +624,8 @@ export default function App() {
 
   const handleWeekSelect = async (weekNum: number | null) => {
     setSelectedWeek(weekNum);
-    if (weekNum === null) {
-      setPrevWeekTeams(null);
-      setPrevWeekError(null);
-      return;
-    }
-    setPrevWeekTeams(null);
-    setPrevWeekError(null);
-    setPrevWeekLoading(true);
+    if (weekNum === null) { setPrevWeekTeams(null); setPrevWeekError(null); return; }
+    setPrevWeekTeams(null); setPrevWeekError(null); setPrevWeekLoading(true);
     try {
       const res = await fetch(`${WORKER_URL}?week=${weekNum}`);
       const data = await res.json() as any;
@@ -641,8 +641,6 @@ export default function App() {
     if (sortKey === key) setSortAsc(a => !a);
     else { setSortKey(key); setSortAsc(false); }
   };
-
-  // Displayed teams: current week uses live scored, prev week uses fetched data
   const displayTeams = selectedWeek === null ? scored : prevWeekTeams;
   const displayWinner = selectedWeek !== null ? weekWinners[selectedWeek] : weekWinners[currentWeekNum];
 
@@ -662,9 +660,8 @@ export default function App() {
         if (!isNaN(parseFloat(val)) || val.startsWith(".")) { nums.push(parseFloat(val)); i++; }
         else break;
       }
-      if (nums.length === 14 && name && !/^\d+$/.test(name)) {
+      if (nums.length === 14 && name && !/^\d+$/.test(name))
         teams.push({ name, r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13] });
-      }
     }
     return teams;
   };
@@ -673,8 +670,7 @@ export default function App() {
     const parsed = parseYahooPaste(manualData);
     if (parsed.length > 0) {
       const ts = new Date().toISOString();
-      setLiveTeams(parsed);
-      setLastUpdated(ts);
+      setLiveTeams(parsed); setLastUpdated(ts);
       await kvSet(TEAMS_KEY, JSON.stringify(parsed));
       await kvSet(TIMESTAMP_KEY, ts);
       setManualData("");
@@ -690,9 +686,10 @@ export default function App() {
       const res = await fetch(WORKER_URL);
       const data = await res.json() as any;
       if (data.ok) {
-        const [teamsVal, tsVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY)]);
+        const [teamsVal, tsVal, h2hVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY), kvGet(H2H_KEY)]);
         if (teamsVal) setLiveTeams(JSON.parse(teamsVal));
         if (tsVal) setLastUpdated(tsVal);
+        if (h2hVal) { const p = JSON.parse(h2hVal); if (p.standings?.length) { setH2h(p.standings); setH2hUpdatedAt(p.updatedAt ?? null); } }
         setSyncResult(`✓ Synced ${data.teams} teams at ${toEastern(data.updatedAt)}`);
       } else { setSyncResult(`✗ Sync failed: ${data.error}`); }
     } catch (e: any) { setSyncResult(`✗ Error: ${e.message}`); }
@@ -741,7 +738,6 @@ export default function App() {
       <style>{globalStyle}</style>
       <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui,sans-serif", color: C.text, background: C.bg, minHeight: "100vh" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
           <div>
             <div style={{ fontSize: 22, fontWeight: 600, color: C.text }}>Heavy Draft Ballers Prize Tracker</div>
@@ -750,31 +746,25 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {([["weekly", "Weekly Detail"], ["grid", "Weekly Payouts"], ["standings", "Playoffs and Sidepots"]] as const).map(([v, label]) => (
+            {([["weekly", "Weekly Detail"], ["grid", "Weekly Payouts"], ["standings", "Playoffs & Side Pots"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} style={btn(view === v)}>{label}</button>
             ))}
           </div>
         </div>
 
-        {/* Weekly Detail tab */}
         {view === "weekly" && (
           <div>
-            {/* Week selector */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
               <select
                 value={selectedWeek === null ? "current" : String(selectedWeek)}
                 onChange={e => handleWeekSelect(e.target.value === "current" ? null : parseInt(e.target.value))}
                 style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 200 }}
               >
-                <option value="current">
-                  Week {currentWeekNum} · {currentWeekSched?.start} – {currentWeekSched?.end} (Current)
-                </option>
+                <option value="current">Week {currentWeekNum} · {currentWeekSched?.start} – {currentWeekSched?.end} (Current)</option>
                 {completedWeeks.slice().reverse().map(w => (
                   <option key={w.week} value={w.week}>Week {w.week} · {w.start} – {w.end}</option>
                 ))}
               </select>
-
-              {/* Winner badge */}
               {displayWinner && (
                 <span style={{ fontSize: 12, color: C.textMuted }}>
                   Winner: <strong style={{ color: C.text }}>{displayWinner.teams.join(" & ")}</strong>
@@ -784,8 +774,6 @@ export default function App() {
                 </span>
               )}
             </div>
-
-            {/* Content */}
             {selectedWeek === null ? (
               <BreakdownTable teams={scored} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} flashMap={flashMap} />
             ) : prevWeekLoading ? (
@@ -802,9 +790,8 @@ export default function App() {
           <SeasonGrid liveScored={scored} snapshots={snapshots} currentWeekNum={currentWeekNum} />
         )}
 
-        {view === "standings" && <StandingsTab />}
+        {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} />}
 
-        {/* Commissioner Panel */}
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
           <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
           {!commUnlocked ? (
@@ -922,10 +909,7 @@ export default function App() {
                   <textarea value={manualData} onChange={e => setManualData(e.target.value)} placeholder="Paste Yahoo table here..."
                     style={{ width: "100%", height: 180, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: `1px solid ${C.border}`, padding: 10, resize: "vertical", background: C.btnBg, color: C.text }} />
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button onClick={handleManualSave}
-                      style={{ fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer", background: "#111", color: "#fff", fontWeight: 500 }}>
-                      Save & recalculate
-                    </button>
+                    <button onClick={handleManualSave} style={{ fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer", background: "#111", color: "#fff", fontWeight: 500 }}>Save & recalculate</button>
                     <button onClick={() => { setManualData(""); setManualResult(null); }} style={btn()}>Clear</button>
                   </div>
                   {manualResult && <div style={{ marginTop: 10, fontSize: 12, color: manualResult.startsWith("✓") ? "green" : "#c00" }}>{manualResult}</div>}
