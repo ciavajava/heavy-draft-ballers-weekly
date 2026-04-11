@@ -70,7 +70,8 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-// Fallback hardcoded standings used until KV data is available
+type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
+
 const FALLBACK_H2H: H2HTeam[] = [
   { name: "Clever Name Here",            w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
   { name: "RL's Some Stars",             w: 22, l: 12, t: 2, winPct: 0.639, gb: 2 },
@@ -87,9 +88,9 @@ const FALLBACK_H2H: H2HTeam[] = [
 ];
 
 const SIDEPOT1_TEAMS = new Set([
-  "Big League Chew-pacabras", "Acuña Matata", "Cleveland Streamers",
-  "Contreras to popular belief", "Maximum IL", "Buudy Mac's Dry Run",
-  "Albert's Pujol", "Clever Name Here",
+  "Big League Chew-pacabras", "Cleveland Streamers", "Buudy Mac's Dry Run",
+  "Albert's Pujol", "Squeaky Green Beans", "Contreras to popular belief",
+  "Maximum IL", "Clever Name Here",
 ]);
 
 const SIDEPOT2_TEAMS = new Set([
@@ -127,8 +128,6 @@ const SEEDED_SNAPSHOT_NAMES: Record<number, string[]> = {
     "Acuña Matata", "Big League Chew-pacabras", "Cleveland Streamers",
   ],
 };
-
-type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
 
 function buildSeededSnapshots(liveNames: string[]): Record<number, Record<string, number>> {
   const result: Record<number, Record<string, number>> = {};
@@ -227,7 +226,7 @@ const C = {
 
 const globalStyle = `
   :root{--bg:#fff;--bg-alt:#f9f9f9;--border:#e5e5e5;--border-light:#f0f0f0;--text:#111;--text-muted:#666;--text-faint:#aaa;--btn-bg:#fff;--btn-active:#f0f0f0;}
-  @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg-alt:#242424;--border:#333;--border-light:#2a2a2a;--text:#f0f0f0;--text-muted:#aaa;--text-faint:#666;--btn-bg:#2a2a2a;--btn-active:#333;}}
+  @media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg-alt:#2a2a2a;--border:#444;--border-light:#333;--text:#f0f0f0;--text-muted:#bbb;--text-faint:#777;--btn-bg:#2a2a2a;--btn-active:#383838;}}
   *{box-sizing:border-box;} body{background:var(--bg);color:var(--text);margin:0;}
   input,select,textarea{background:var(--btn-bg)!important;color:var(--text)!important;border-color:var(--border)!important;}
   input::placeholder,textarea::placeholder{color:var(--text-faint)!important;}
@@ -405,21 +404,25 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
   );
 }
 
-function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
+function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, showPlayoff }: {
   rows: { name: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number }[];
-  prizes: Record<number, number>; accentColor: string; accentBg: string; showPlayoff: boolean;
+  prizes: Record<number, number>;
+  accentColor: string;
+  accentBg: string;
+  accentBorder: string;
+  showPlayoff: boolean;
 }) {
   return (
-    <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+    <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
       <thead>
         <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 28, color: C.text }}>#</th>
-          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
-          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L-T</th>
-          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L%</th>
-          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>GB</th>
-          {showPlayoff && <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>Playoffs</th>}
-          <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: accentColor, background: accentBg }}>Proj. Winnings</th>
+          <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, width: 28, color: C.text }}>#</th>
+          <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+          <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, color: C.text }}>W-L-T</th>
+          <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, color: C.text }}>W-L%</th>
+          <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, color: C.text }}>GB</th>
+          {showPlayoff && <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600, color: C.text }}>Playoffs</th>}
+          <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 700, color: accentColor, minWidth: 110 }}>Proj. Winnings</th>
         </tr>
       </thead>
       <tbody>
@@ -431,22 +434,24 @@ function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
             <tr key={team.name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
               onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-              <td style={{ padding: "10px 8px", color: C.textFaint, fontSize: 12 }}>{team.rank}</td>
-              <td style={{ padding: "10px 8px", fontWeight: prize > 0 ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>{team.name}</td>
-              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted }}>{team.w}-{team.l}-{team.t}</td>
-              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted }}>{fmtPct(team.winPct)}</td>
-              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textFaint }}>{fmtGb(team.gb)}</td>
+              <td style={{ padding: "12px 10px", color: C.textFaint, fontSize: 12 }}>{team.rank}</td>
+              <td style={{ padding: "12px 10px", fontWeight: prize > 0 ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>{team.name}</td>
+              <td style={{ padding: "12px 10px", textAlign: "center", color: C.text, fontWeight: 500 }}>{team.w}-{team.l}-{team.t}</td>
+              <td style={{ padding: "12px 10px", textAlign: "center", color: C.textMuted }}>{fmtPct(team.winPct)}</td>
+              <td style={{ padding: "12px 10px", textAlign: "center", color: C.textFaint }}>{fmtGb(team.gb)}</td>
               {showPlayoff && (
-                <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                <td style={{ padding: "12px 10px", textAlign: "center" }}>
                   {hasBye
-                    ? <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "rgba(34,197,94,0.15)", padding: "2px 8px", borderRadius: 10 }}>✓ Bye</span>
+                    ? <span style={{ fontSize: 12, fontWeight: 700, color: "#15803d", background: "rgba(34,197,94,0.2)", padding: "3px 10px", borderRadius: 12 }}>✓ Bye</span>
                     : inPlayoffs
-                      ? <span style={{ fontSize: 11, fontWeight: 600, color: "#0369a1", background: "rgba(59,130,246,0.1)", padding: "2px 8px", borderRadius: 10 }}>✓ In</span>
-                      : <span style={{ fontSize: 11, color: C.textFaint }}>—</span>}
+                      ? <span style={{ fontSize: 12, fontWeight: 600, color: "#0369a1", background: "rgba(59,130,246,0.15)", padding: "3px 10px", borderRadius: 12 }}>✓ In</span>
+                      : <span style={{ fontSize: 12, color: C.textFaint }}>—</span>}
                 </td>
               )}
-              <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: prize > 0 ? 700 : 400, color: prize > 0 ? accentColor : C.textFaint, background: accentBg }}>
-                {fmtMoney(prize)}
+              <td style={{ padding: "12px 12px", textAlign: "right" }}>
+                {prize > 0
+                  ? <span style={{ fontWeight: 700, fontSize: 14, color: accentColor, background: accentBg, border: `1px solid ${accentBorder}`, padding: "3px 10px", borderRadius: 8, display: "inline-block" }}>{fmtMoney(prize)}</span>
+                  : <span style={{ color: C.textFaint, fontSize: 13 }}>—</span>}
               </td>
             </tr>
           );
@@ -462,12 +467,12 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, accentBg
 }) {
   return (
     <div style={{ marginBottom: 36, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ background: accentBg, borderBottom: `1px solid ${borderColor}`, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ background: accentBg, borderBottom: `1px solid ${borderColor}`, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: accentColor }}>{emoji} {title}</div>
-          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{subtitle}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: accentColor }}>{emoji} {title}</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3 }}>{subtitle}</div>
         </div>
-        <div style={{ fontSize: 12, color: C.textMuted }}>{payoutDesc}</div>
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{payoutDesc}</div>
       </div>
       <div style={{ overflowX: "auto" }}>{children}</div>
     </div>
@@ -488,24 +493,24 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
       )}
       <PotSection
         title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
-        emoji="🏆" borderColor="#86efac" accentColor="#15803d" accentBg="rgba(240,253,244,0.8)"
+        emoji="🏆" borderColor="#86efac" accentColor="#15803d" accentBg="rgba(240,253,244,0.9)"
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}
       >
-        <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(240,253,244,0.5)" showPlayoff={true} />
+        <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
       <PotSection
         title="Side Pot #1" subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
-        emoji="💛" borderColor="#fde047" accentColor="#854d0e" accentBg="rgba(254,252,232,0.8)"
+        emoji="💛" borderColor="#fde047" accentColor="#854d0e" accentBg="rgba(254,252,232,0.9)"
         payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}
       >
-        <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(254,252,232,0.5)" showPlayoff={false} />
+        <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
       <PotSection
         title="Side Pot #2" subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
-        emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8" accentBg="rgba(239,246,255,0.8)"
+        emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8" accentBg="rgba(239,246,255,0.9)"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}
       >
-        <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(239,246,255,0.5)" showPlayoff={false} />
+        <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
     </div>
   );
@@ -579,7 +584,6 @@ export default function App() {
       const [teamsVal, tsVal, h2hVal] = await Promise.all([
         kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY), kvGet(H2H_KEY),
       ]);
-
       if (teamsVal) {
         const newTeams: Team[] = JSON.parse(teamsVal);
         if (!initial) triggerFlashRef.current(newTeams);
@@ -605,16 +609,10 @@ export default function App() {
       } else if (initial) {
         setLoading(false);
       }
-
       if (tsVal) setLastUpdated(tsVal);
-
-      // Load H2H standings from KV, fall back to hardcoded if not yet available
       if (h2hVal) {
         const parsed = JSON.parse(h2hVal);
-        if (parsed.standings?.length) {
-          setH2h(parsed.standings);
-          setH2hUpdatedAt(parsed.updatedAt ?? null);
-        }
+        if (parsed.standings?.length) { setH2h(parsed.standings); setH2hUpdatedAt(parsed.updatedAt ?? null); }
       }
     };
     load(true);
@@ -758,8 +756,7 @@ export default function App() {
               <select
                 value={selectedWeek === null ? "current" : String(selectedWeek)}
                 onChange={e => handleWeekSelect(e.target.value === "current" ? null : parseInt(e.target.value))}
-                style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 200 }}
-              >
+                style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 200 }}>
                 <option value="current">Week {currentWeekNum} · {currentWeekSched?.start} – {currentWeekSched?.end} (Current)</option>
                 {completedWeeks.slice().reverse().map(w => (
                   <option key={w.week} value={w.week}>Week {w.week} · {w.start} – {w.end}</option>
