@@ -70,6 +70,47 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
+// H2H standings — hardcoded from Yahoo screenshot, will be live-pulled later
+const H2H_STANDINGS = [
+  { name: "Clever Name Here",           w: 24, l: 11, t: 1 },
+  { name: "RL's Some Stars",            w: 22, l: 12, t: 2 },
+  { name: "Uptown Finest",              w: 19, l: 13, t: 4 },
+  { name: "Buudy Mac's Dry Run",        w: 18, l: 15, t: 3 },
+  { name: "Albert's Pujol",             w: 16, l: 15, t: 5 },
+  { name: "Jim Leyland's Lungs",        w: 17, l: 16, t: 3 },
+  { name: "Cleveland Streamers",        w: 16, l: 16, t: 4 },
+  { name: "Squeaky Green Beans",        w: 16, l: 17, t: 3 },
+  { name: "Big League Chew-pacabras",   w: 15, l: 18, t: 3 },
+  { name: "Contreras to popular belief",w: 15, l: 19, t: 2 },
+  { name: "Acuña Matata",              w: 13, l: 19, t: 4 },
+  { name: "Maximum IL",                 w: 7,  l: 27, t: 2 },
+];
+
+// Sidepot membership
+const SIDEPOT1_TEAMS = new Set([
+  "Big League Chew-pacabras",
+  "Acuña Matata",
+  "Cleveland Streamers",
+  "Contreras to popular belief",
+  "Maximum IL",
+  "Buudy Mac's Dry Run",
+  "Albert's Pujol",
+  "Clever Name Here",
+]);
+
+const SIDEPOT2_TEAMS = new Set([
+  "Squeaky Green Beans",
+  "Contreras to popular belief",
+  "Maximum IL",
+  "Clever Name Here",
+]);
+
+// Payout tables
+const PLAYOFF_PRIZES: Record<number, number> = { 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 };
+
+const SIDEPOT1_PAYOUTS: Record<number, number> = { 1: 330, 2: 170, 3: 100 };
+const SIDEPOT2_PAYOUTS: Record<number, number> = { 1: 190, 2: 110 };
+
 const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
   1: [
     { pts: 109.5 }, { pts: 106.5 }, { pts: 102.5 }, { pts: 84 }, { pts: 82.5 },
@@ -167,6 +208,7 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
 }
 
 function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
+function fmtMoney(v: number) { return v > 0 ? `$${v}` : "—"; }
 
 function toEastern(iso: string) {
   return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) + " ET";
@@ -320,14 +362,9 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 
   return (
     <div>
-      {/* Two-panel banner */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {kingTeam && (
-          <div style={{
-            flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
-            padding: "12px 16px", borderRadius: 8,
-            background: "#fffbeb", border: "1px solid #f59e0b",
-          }}>
+          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "#fffbeb", border: "1px solid #f59e0b" }}>
             <span style={{ fontSize: 20 }}>👑</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#b45309" }}>One-Week Score to Beat</div>
@@ -339,11 +376,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
           </div>
         )}
         {seasonLeader && (
-          <div style={{
-            flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
-            padding: "12px 16px", borderRadius: 8,
-            background: "#f0fdf4", border: "1px solid #86efac",
-          }}>
+          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #86efac" }}>
             <span style={{ fontSize: 20 }}>🏆</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d" }}>Season Total Leader</div>
@@ -359,7 +392,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
         <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-              {/* Team + Season Total headers — verticalAlign top to match week headers */}
               <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1, verticalAlign: "top" }}>Team</th>
               <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap", background: "var(--bg-alt,#f9f9f9)", verticalAlign: "top" }}>Season Total</th>
               {visibleWeeks.map(w => {
@@ -368,12 +400,9 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                 const sched = WEEK_SCHEDULE[w - 1];
                 return (
                   <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap", verticalAlign: "top" }}>
-                    {isCurrentWeek && (
-                      <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>
-                    )}
-                    {!isCurrentWeek && (
-                      <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>
-                    )}
+                    {isCurrentWeek
+                      ? <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>
+                      : <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>}
                     <div>Wk {w}</div>
                     {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
                   </th>
@@ -382,42 +411,170 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
             </tr>
           </thead>
           <tbody>
-            {sortedTeams.map((name, idx) => {
+            {sortedTeams.map((name, idx) => (
+              <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text, textAlign: "left" }}>
+                  <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
+                  <span>{name}</span>
+                </td>
+                <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>
+                  {fmtPts(seasonTotals[name] ?? 0)}
+                </td>
+                {visibleWeeks.map(w => {
+                  const isCurrentWeek = w === currentWeekNum;
+                  const isFuture = w > currentWeekNum;
+                  const snap = snapshots[w];
+                  const score = isCurrentWeek ? liveScores[name] : snap?.[name];
+                  const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
+                  const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
+                  let cellBg = "transparent";
+                  let cellColor = C.text;
+                  let cellWeight: React.CSSProperties["fontWeight"] = 400;
+                  if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
+                  else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
+                  return (
+                    <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: isFuture ? C.textFaint : cellColor, fontWeight: cellWeight }}>
+                      {isFuture ? <span style={{ color: C.textFaint }}>—</span> : score != null ? <>{isWeekHigh ? "💰 " : ""}{fmtPts(score)}</> : <span style={{ color: C.textFaint }}>—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function StandingsTab() {
+  // Sort H2H by wins desc, then ties desc as tiebreaker
+  const sorted = [...H2H_STANDINGS].sort((a, b) => b.w - a.w || b.t - a.t);
+
+  // Sidepot rankings — rank among members only by overall H2H finish
+  const sp1Rank: Record<string, number> = {};
+  const sp2Rank: Record<string, number> = {};
+  let sp1Counter = 1;
+  let sp2Counter = 1;
+  sorted.forEach(t => {
+    if (SIDEPOT1_TEAMS.has(t.name)) { sp1Rank[t.name] = sp1Counter++; }
+    if (SIDEPOT2_TEAMS.has(t.name)) { sp2Rank[t.name] = sp2Counter++; }
+  });
+
+  const sp1Count = SIDEPOT1_TEAMS.size;
+  const sp2Count = SIDEPOT2_TEAMS.size;
+
+  return (
+    <div>
+      {/* Prize pool info banners */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #86efac" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d", marginBottom: 6 }}>🏆 Playoff Prize Pool</div>
+          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
+            <div>1st — <strong style={{ color: C.text }}>$475</strong></div>
+            <div>2nd — <strong style={{ color: C.text }}>$275</strong></div>
+            <div>3rd — <strong style={{ color: C.text }}>$150</strong></div>
+            <div>4th–6th — <strong style={{ color: C.text }}>$25</strong> each</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#fefce8", border: "1px solid #fde047" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#854d0e", marginBottom: 6 }}>💛 Side Pot #1 ({sp1Count} teams)</div>
+          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
+            <div>1st — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[1])}</strong></div>
+            <div>2nd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[2])}</strong></div>
+            <div>3rd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[3])}</strong></div>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#eff6ff", border: "1px solid #93c5fd" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#1d4ed8", marginBottom: 6 }}>💙 Side Pot #2 ({sp2Count} teams)</div>
+          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
+            <div>1st — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT2_PAYOUTS[1])}</strong></div>
+            <div>2nd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT2_PAYOUTS[2])}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
+        H2H standings · Playoff spots: top 6 · Byes: top 2 · Projected payouts based on current standings
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+              <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 28, color: C.text }}>#</th>
+              <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L-T</th>
+              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>Playoffs</th>
+              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: "#854d0e" }}>SP1 Rank</th>
+              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: "#1d4ed8" }}>SP2 Rank</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: C.text }}>Proj. Playoff $</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: "#854d0e" }}>Proj. SP1 $</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: "#1d4ed8" }}>Proj. SP2 $</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>Total Proj. $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((team, idx) => {
+              const rank = idx + 1;
+              const inPlayoffs = rank <= 6;
+              const hasBye = rank <= 2;
+              const inSP1 = SIDEPOT1_TEAMS.has(team.name);
+              const inSP2 = SIDEPOT2_TEAMS.has(team.name);
+              const playoffPrize = inPlayoffs ? (PLAYOFF_PRIZES[rank] ?? 0) : 0;
+              const sp1Prize = inSP1 ? (SIDEPOT1_PAYOUTS[sp1Rank[team.name]] ?? 0) : 0;
+              const sp2Prize = inSP2 ? (SIDEPOT2_PAYOUTS[sp2Rank[team.name]] ?? 0) : 0;
+              const total = playoffPrize + sp1Prize + sp2Prize;
+
+              const rowBg = hasBye
+                ? "rgba(34,197,94,0.06)"
+                : inPlayoffs
+                  ? "rgba(34,197,94,0.03)"
+                  : "transparent";
+
               return (
-                <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                <tr key={team.name}
+                  style={{ borderBottom: `1px solid ${C.borderLight}`, background: rowBg }}
                   onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
-                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                  <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text, textAlign: "left" }}>
-                    <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
-                    <span>{name}</span>
+                  onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+                  <td style={{ padding: "10px 8px", color: C.textFaint, fontSize: 12 }}>{rank}</td>
+                  <td style={{ padding: "10px 8px", fontWeight: inPlayoffs ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>
+                    {team.name}
                   </td>
-                  <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>
-                    {fmtPts(seasonTotals[name] ?? 0)}
+                  <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>
+                    {team.w}-{team.l}-{team.t}
                   </td>
-                  {visibleWeeks.map(w => {
-                    const isCurrentWeek = w === currentWeekNum;
-                    const isFuture = w > currentWeekNum;
-                    const snap = snapshots[w];
-                    const score = isCurrentWeek ? liveScores[name] : snap?.[name];
-                    const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
-                    const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
-
-                    let cellBg = "transparent";
-                    let cellColor = C.text;
-                    let cellWeight: React.CSSProperties["fontWeight"] = 400;
-                    if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
-                    else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
-
-                    return (
-                      <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: isFuture ? C.textFaint : cellColor, fontWeight: cellWeight }}>
-                        {isFuture
-                          ? <span style={{ color: C.textFaint }}>—</span>
-                          : score != null
-                            ? <>{isWeekHigh ? "💰 " : ""}{fmtPts(score)}</>
-                            : <span style={{ color: C.textFaint }}>—</span>}
-                      </td>
-                    );
-                  })}
+                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                    {hasBye
+                      ? <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "rgba(34,197,94,0.15)", padding: "2px 8px", borderRadius: 10 }}>✓ Bye</span>
+                      : inPlayoffs
+                        ? <span style={{ fontSize: 11, fontWeight: 600, color: "#0369a1", background: "rgba(59,130,246,0.1)", padding: "2px 8px", borderRadius: 10 }}>✓ In</span>
+                        : <span style={{ fontSize: 11, color: C.textFaint }}>—</span>}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                    {inSP1
+                      ? <span style={{ fontSize: 12, fontWeight: 600, color: "#854d0e" }}>#{sp1Rank[team.name]}</span>
+                      : <span style={{ color: C.textFaint }}>—</span>}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                    {inSP2
+                      ? <span style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8" }}>#{sp2Rank[team.name]}</span>
+                      : <span style={{ color: C.textFaint }}>—</span>}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", color: playoffPrize > 0 ? "#15803d" : C.textFaint, fontWeight: playoffPrize > 0 ? 600 : 400 }}>
+                    {fmtMoney(playoffPrize)}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", color: sp1Prize > 0 ? "#854d0e" : C.textFaint, fontWeight: sp1Prize > 0 ? 600 : 400 }}>
+                    {inSP1 ? fmtMoney(sp1Prize) : <span style={{ color: C.textFaint }}>N/A</span>}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", color: sp2Prize > 0 ? "#1d4ed8" : C.textFaint, fontWeight: sp2Prize > 0 ? 600 : 400 }}>
+                    {inSP2 ? fmtMoney(sp2Prize) : <span style={{ color: C.textFaint }}>N/A</span>}
+                  </td>
+                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700, color: total > 0 ? C.text : C.textFaint, background: "var(--bg-alt,#f9f9f9)" }}>
+                    {fmtMoney(total)}
+                  </td>
                 </tr>
               );
             })}
@@ -429,7 +586,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 }
 
 export default function App() {
-  const [view, setView] = useState<"current" | "previous" | "winners">("current");
+  const [view, setView] = useState<"current" | "previous" | "winners" | "standings">("current");
   const [sortKey, setSortKey] = useState("total");
   const [sortAsc, setSortAsc] = useState(false);
   const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
@@ -505,22 +662,15 @@ export default function App() {
         prevTeamsRef.current = newMap;
         prevScoredRef.current = computeRoto(newTeams);
         setLiveTeams(newTeams);
-
         if (initial) {
           const realNames = newTeams.map(t => t.name);
           const seeded = buildSeededSnapshots(realNames);
           const ww: Record<number, WeekWinner> = {};
           const snaps: Record<number, Record<string, number>> = { ...seeded };
           await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
-            const [val, snapVal] = await Promise.all([
-              kvGet(WEEK_PREFIX + w),
-              kvGet(`${SNAPSHOT_PREFIX}${w}_snapshot`),
-            ]);
+            const [val, snapVal] = await Promise.all([kvGet(WEEK_PREFIX + w), kvGet(`${SNAPSHOT_PREFIX}${w}_snapshot`)]);
             if (val) ww[w] = JSON.parse(val);
-            if (snapVal) {
-              const parsed = JSON.parse(snapVal);
-              snaps[w] = parsed.scores ?? parsed;
-            }
+            if (snapVal) { const parsed = JSON.parse(snapVal); snaps[w] = parsed.scores ?? parsed; }
           }));
           setWeekWinners(ww);
           setSnapshots(snaps);
@@ -544,14 +694,9 @@ export default function App() {
     try {
       const res = await fetch(`${WORKER_URL}?week=${weekNum}`);
       const data = await res.json() as any;
-      if (data.ok) {
-        setPrevWeekTeams(computeRoto(data.teams));
-      } else {
-        setPrevWeekError(data.error || "Failed to load week data");
-      }
-    } catch (e: any) {
-      setPrevWeekError(e.message);
-    }
+      if (data.ok) { setPrevWeekTeams(computeRoto(data.teams)); }
+      else { setPrevWeekError(data.error || "Failed to load week data"); }
+    } catch (e: any) { setPrevWeekError(e.message); }
     setPrevWeekLoading(false);
   };
 
@@ -614,12 +759,8 @@ export default function App() {
         if (teamsVal) setLiveTeams(JSON.parse(teamsVal));
         if (tsVal) setLastUpdated(tsVal);
         setSyncResult(`✓ Synced ${data.teams} teams at ${toEastern(data.updatedAt)}`);
-      } else {
-        setSyncResult(`✗ Sync failed: ${data.error}`);
-      }
-    } catch (e: any) {
-      setSyncResult(`✗ Error: ${e.message}`);
-    }
+      } else { setSyncResult(`✗ Sync failed: ${data.error}`); }
+    } catch (e: any) { setSyncResult(`✗ Error: ${e.message}`); }
     setSyncing(false);
   };
 
@@ -677,7 +818,7 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Season Grid"]] as const).map(([v, label]) => (
+            {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Season Grid"], ["standings", "Standings & Payouts"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} style={btn(view === v)}>{label}</button>
             ))}
           </div>
@@ -728,6 +869,8 @@ export default function App() {
         {view === "winners" && (
           <SeasonGrid liveScored={scored} snapshots={snapshots} currentWeekNum={currentWeekNum} />
         )}
+
+        {view === "standings" && <StandingsTab />}
 
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
           <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
