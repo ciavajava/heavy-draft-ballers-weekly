@@ -750,7 +750,7 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {([["weekly", "Weekly Detail"], ["grid", "Season Grid"], ["standings", "Standings & Payouts"]] as const).map(([v, label]) => (
+            {([["weekly", "Weekly Detail"], ["grid", "Weekly Payouts"], ["standings", "Playoffs and Sidepots"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} style={btn(view === v)}>{label}</button>
             ))}
           </div>
