@@ -254,19 +254,21 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   );
 }
 
-function SeasonGrid({ liveTeams, snapshots, currentWeekNum }: {
-  liveTeams: Team[];
+// SeasonGrid now receives already-computed liveScored instead of raw liveTeams
+function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
+  liveScored: ScoredTeam[];
   snapshots: Record<number, Record<string, number>>;
   currentWeekNum: number;
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
 
-  const liveScored = computeRoto(liveTeams);
+  // Build live scores map from already-computed scored array
   const liveScores: Record<string, number> = {};
   liveScored.forEach(t => { liveScores[t.name] = t.total; });
 
-  const allTeamNames = DEFAULT_DATA.map(t => t.name);
+  // Use team names from liveScored so we always have the full real set
+  const allTeamNames = liveScored.map(t => t.name);
 
   const seasonTotals: Record<string, number> = {};
   allTeamNames.forEach(name => {
@@ -695,7 +697,7 @@ export default function App() {
 
         {view === "winners" && (
           <SeasonGrid
-            liveTeams={liveTeams}
+            liveScored={scored}
             snapshots={snapshots}
             currentWeekNum={currentWeekNum}
           />
