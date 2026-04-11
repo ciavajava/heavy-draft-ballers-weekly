@@ -70,7 +70,6 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-// Hardcoded snapshots for weeks that locked before snapshot feature was added
 const SEEDED_SNAPSHOTS: Record<number, Record<string, number>> = {
   1: {
     "RL's Some Stars": 109.5,
@@ -255,25 +254,20 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   );
 }
 
-// Season grid component for the Winners tab
-function SeasonGrid({ liveTeams, weekWinners, snapshots, currentWeekNum }: {
+function SeasonGrid({ liveTeams, snapshots, currentWeekNum }: {
   liveTeams: Team[];
-  weekWinners: Record<number, WeekWinner>;
   snapshots: Record<number, Record<string, number>>;
   currentWeekNum: number;
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
 
-  // Current week live scores
   const liveScored = computeRoto(liveTeams);
   const liveScores: Record<string, number> = {};
   liveScored.forEach(t => { liveScores[t.name] = t.total; });
 
-  // All team names from DEFAULT_DATA (stable ordering source)
   const allTeamNames = DEFAULT_DATA.map(t => t.name);
 
-  // Compute season totals: sum of all completed week snapshots + current week live
   const seasonTotals: Record<string, number> = {};
   allTeamNames.forEach(name => {
     let total = 0;
@@ -281,27 +275,21 @@ function SeasonGrid({ liveTeams, weekWinners, snapshots, currentWeekNum }: {
       const snap = snapshots[w];
       if (snap && snap[name] != null) total += snap[name];
     });
-    // Add current week live
     if (liveScores[name] != null) total += liveScores[name];
     seasonTotals[name] = total;
   });
 
-  // Sort teams by season total descending
   const sortedTeams = [...allTeamNames].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
 
-  // Find weekly high scores for completed weeks (for gold highlight)
   const weekHighScores: Record<number, number> = {};
   completedWeekNums.forEach(w => {
     const snap = snapshots[w];
     if (!snap) return;
-    const max = Math.max(...Object.values(snap));
-    weekHighScores[w] = max;
+    weekHighScores[w] = Math.max(...Object.values(snap));
   });
 
-  // Current week leader score
   const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
 
-  // King of the hill: highest single-week score across all completed weeks
   let kingScore = 0;
   let kingTeam = "";
   let kingWeek = 0;
@@ -313,19 +301,16 @@ function SeasonGrid({ liveTeams, weekWinners, snapshots, currentWeekNum }: {
     });
   });
 
-  // Season total leader
   const seasonLeader = sortedTeams[0];
-
-  const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2); // show a couple future cols
+  const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
 
   return (
     <div>
-      {/* King of the hill banner */}
       {kingTeam && (
         <div style={{
           display: "flex", alignItems: "center", gap: 12, marginBottom: 20,
           padding: "12px 16px", borderRadius: 8,
-          background: "var(--king-bg, #fffbeb)", border: "1px solid var(--king-border, #f59e0b)",
+          background: "var(--king-bg,#fffbeb)", border: "1px solid #f59e0b",
         }}>
           <span style={{ fontSize: 20 }}>👑</span>
           <div>
@@ -338,7 +323,6 @@ function SeasonGrid({ liveTeams, weekWinners, snapshots, currentWeekNum }: {
         </div>
       )}
 
-      {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
           <div style={{ width: 12, height: 12, borderRadius: 3, background: "#d97706", opacity: 0.85 }} />
@@ -428,13 +412,11 @@ export default function App() {
   const prevScoredRef = useRef<ScoredTeam[]>([]);
   const prevTeamsRef = useRef<Record<string, Team>>({});
 
-  // Previous weeks
   const [selectedPrevWeek, setSelectedPrevWeek] = useState<number | null>(null);
   const [prevWeekTeams, setPrevWeekTeams] = useState<ScoredTeam[] | null>(null);
   const [prevWeekLoading, setPrevWeekLoading] = useState(false);
   const [prevWeekError, setPrevWeekError] = useState<string | null>(null);
 
-  // Commissioner
   const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
@@ -653,7 +635,6 @@ export default function App() {
       <style>{globalStyle}</style>
       <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui,sans-serif", color: C.text, background: C.bg, minHeight: "100vh" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
           <div>
             <div style={{ fontSize: 22, fontWeight: 600, color: C.text }}>Heavy Draft Ballers Weekly Prize Tracker</div>
@@ -670,7 +651,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Current Week */}
         {view === "current" && (
           <>
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
@@ -680,7 +660,6 @@ export default function App() {
           </>
         )}
 
-        {/* Previous Weeks */}
         {view === "previous" && (
           <div>
             {completedWeeks.length === 0 ? (
@@ -704,7 +683,6 @@ export default function App() {
                     </span>
                   )}
                 </div>
-
                 {prevWeekLoading && <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0" }}>Loading week data from Yahoo...</div>}
                 {prevWeekError && <div style={{ fontSize: 13, color: "#c00", padding: "12px 0" }}>Error: {prevWeekError}</div>}
                 {prevWeekTeams && !prevWeekLoading && (
@@ -715,17 +693,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Season Grid (Winners tab) */}
         {view === "winners" && (
           <SeasonGrid
             liveTeams={liveTeams}
-            weekWinners={weekWinners}
             snapshots={snapshots}
             currentWeekNum={currentWeekNum}
           />
         )}
 
-        {/* Commissioner Panel */}
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
           <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
 
