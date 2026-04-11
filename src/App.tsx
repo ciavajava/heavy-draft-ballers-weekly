@@ -70,6 +70,38 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
+// Hardcoded snapshots for weeks that locked before snapshot feature was added
+const SEEDED_SNAPSHOTS: Record<number, Record<string, number>> = {
+  1: {
+    "RL's Some Stars": 109.5,
+    "Big League Chew-pacabras": 106.5,
+    "Clever Name Here": 102.5,
+    "Squeaky Green Beans": 84,
+    "Acuña Matata": 82.5,
+    "Cleveland Streamers": 77.5,
+    "Albert's Pujol": 71.5,
+    "Buudy Mac's Dry Run": 65,
+    "Uptown Finest": 64,
+    "Maximum IL": 58,
+    "Contreras to popular belief": 57.5,
+    "Jim Leyland's Lungs": 57.5,
+  },
+  2: {
+    "Squeaky Green Beans": 120,
+    "Clever Name Here": 100.5,
+    "Contreras to popular belief": 92,
+    "RL's Some Stars": 85,
+    "Maximum IL": 79.5,
+    "Jim Leyland's Lungs": 77.5,
+    "Uptown Finest": 72,
+    "Albert's Pujol": 71,
+    "Buudy Mac's Dry Run": 65,
+    "Acuña Matata": 61.5,
+    "Big League Chew-pacabras": 57.5,
+    "Cleveland Streamers": 54.5,
+  },
+};
+
 function getCurrentWeekNum() {
   const now = new Date();
   const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
@@ -92,6 +124,7 @@ type WeekWinner = { week: number; teams: string[]; points: number; finalized?: b
 const TEAMS_KEY = "roto_live_teams";
 const TIMESTAMP_KEY = "roto_last_updated";
 const WEEK_PREFIX = "roto_week_";
+const SNAPSHOT_PREFIX = "roto_week_";
 
 function scoreCategory(teams: Team[], cat: typeof CATS[0]) {
   const n = teams.length;
@@ -222,6 +255,166 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   );
 }
 
+// Season grid component for the Winners tab
+function SeasonGrid({ liveTeams, weekWinners, snapshots, currentWeekNum }: {
+  liveTeams: Team[];
+  weekWinners: Record<number, WeekWinner>;
+  snapshots: Record<number, Record<string, number>>;
+  currentWeekNum: number;
+}) {
+  const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
+  const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
+
+  // Current week live scores
+  const liveScored = computeRoto(liveTeams);
+  const liveScores: Record<string, number> = {};
+  liveScored.forEach(t => { liveScores[t.name] = t.total; });
+
+  // All team names from DEFAULT_DATA (stable ordering source)
+  const allTeamNames = DEFAULT_DATA.map(t => t.name);
+
+  // Compute season totals: sum of all completed week snapshots + current week live
+  const seasonTotals: Record<string, number> = {};
+  allTeamNames.forEach(name => {
+    let total = 0;
+    completedWeekNums.forEach(w => {
+      const snap = snapshots[w];
+      if (snap && snap[name] != null) total += snap[name];
+    });
+    // Add current week live
+    if (liveScores[name] != null) total += liveScores[name];
+    seasonTotals[name] = total;
+  });
+
+  // Sort teams by season total descending
+  const sortedTeams = [...allTeamNames].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
+
+  // Find weekly high scores for completed weeks (for gold highlight)
+  const weekHighScores: Record<number, number> = {};
+  completedWeekNums.forEach(w => {
+    const snap = snapshots[w];
+    if (!snap) return;
+    const max = Math.max(...Object.values(snap));
+    weekHighScores[w] = max;
+  });
+
+  // Current week leader score
+  const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
+
+  // King of the hill: highest single-week score across all completed weeks
+  let kingScore = 0;
+  let kingTeam = "";
+  let kingWeek = 0;
+  completedWeekNums.forEach(w => {
+    const snap = snapshots[w];
+    if (!snap) return;
+    Object.entries(snap).forEach(([name, pts]) => {
+      if (pts > kingScore) { kingScore = pts; kingTeam = name; kingWeek = w; }
+    });
+  });
+
+  // Season total leader
+  const seasonLeader = sortedTeams[0];
+
+  const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2); // show a couple future cols
+
+  return (
+    <div>
+      {/* King of the hill banner */}
+      {kingTeam && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 20,
+          padding: "12px 16px", borderRadius: 8,
+          background: "var(--king-bg, #fffbeb)", border: "1px solid var(--king-border, #f59e0b)",
+        }}>
+          <span style={{ fontSize: 20 }}>👑</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#b45309" }}>One-Week Score to Beat</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+              {kingTeam} — <span style={{ color: "#b45309" }}>{fmtPts(kingScore)} pts</span>
+              <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted, marginLeft: 8 }}>Week {kingWeek}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#d97706", opacity: 0.85 }} />
+          Week winner (final)
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#3b82f6", opacity: 0.7 }} />
+          Current week leader
+        </div>
+      </div>
+
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+              <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1 }}>Team</th>
+              <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap" }}>Season Total</th>
+              {visibleWeeks.map(w => {
+                const isCurrentWeek = w === currentWeekNum;
+                const isFuture = w > currentWeekNum;
+                const sched = WEEK_SCHEDULE[w - 1];
+                return (
+                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap" }}>
+                    {isCurrentWeek && <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>}
+                    <div>Wk {w}</div>
+                    {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedTeams.map((name, idx) => {
+              const isSeasonLeader = name === seasonLeader;
+              return (
+                <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+                  onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text }}>
+                    <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
+                    <span style={{ fontWeight: isSeasonLeader ? 700 : 400 }}>{name}</span>
+                    {isSeasonLeader && <span style={{ marginLeft: 6, fontSize: 10, color: "#b45309" }}>★</span>}
+                  </td>
+                  <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text }}>
+                    {fmtPts(seasonTotals[name] ?? 0)}
+                  </td>
+                  {visibleWeeks.map(w => {
+                    const isCurrentWeek = w === currentWeekNum;
+                    const isFuture = w > currentWeekNum;
+                    const snap = snapshots[w];
+                    const score = isCurrentWeek ? liveScores[name] : snap?.[name];
+                    const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
+                    const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
+
+                    let cellBg = "transparent";
+                    let cellColor = C.text;
+                    let cellWeight: React.CSSProperties["fontWeight"] = 400;
+                    if (isWeekHigh) { cellBg = "rgba(217,119,6,0.12)"; cellColor = "#b45309"; cellWeight = 700; }
+                    else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
+
+                    return (
+                      <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: isFuture ? C.textFaint : cellColor, fontWeight: cellWeight }}>
+                        {isFuture ? <span style={{ color: C.textFaint }}>—</span> : score != null ? fmtPts(score) : <span style={{ color: C.textFaint }}>—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<"current" | "previous" | "winners">("current");
   const [sortKey, setSortKey] = useState("total");
@@ -229,6 +422,7 @@ export default function App() {
   const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
+  const [snapshots, setSnapshots] = useState<Record<number, Record<string, number>>>(SEEDED_SNAPSHOTS);
   const [loading, setLoading] = useState(true);
   const [flashMap, setFlashMap] = useState<Record<string, string>>({});
   const prevScoredRef = useRef<ScoredTeam[]>([]);
@@ -250,6 +444,8 @@ export default function App() {
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [manualData, setManualData] = useState("");
   const [manualResult, setManualResult] = useState<string | null>(null);
+
+  const currentWeekNum = getCurrentWeekNum();
 
   const triggerFlash = (newTeams: Team[]) => {
     const oldTeams = prevTeamsRef.current;
@@ -302,11 +498,20 @@ export default function App() {
       if (tsVal) setLastUpdated(tsVal);
       if (initial) {
         const ww: Record<number, WeekWinner> = {};
+        const snaps: Record<number, Record<string, number>> = { ...SEEDED_SNAPSHOTS };
         await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
-          const val = await kvGet(WEEK_PREFIX + w);
+          const [val, snapVal] = await Promise.all([
+            kvGet(WEEK_PREFIX + w),
+            kvGet(`${SNAPSHOT_PREFIX}${w}_snapshot`),
+          ]);
           if (val) ww[w] = JSON.parse(val);
+          if (snapVal) {
+            const parsed = JSON.parse(snapVal);
+            snaps[w] = parsed.scores ?? parsed;
+          }
         }));
         setWeekWinners(ww);
+        setSnapshots(snaps);
         setLoading(false);
       }
     };
@@ -457,7 +662,7 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Winners"]] as const).map(([v, label]) => (
+            {([["current", "Current Week"], ["previous", "Previous Weeks"], ["winners", "Season Grid"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} style={btn(view === v)}>
                 {label}
               </button>
@@ -510,44 +715,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Winners */}
+        {/* Season Grid (Winners tab) */}
         {view === "winners" && (
-          <div>
-            {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).some(w => weekWinners[w]) ? (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-                    <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, width: 80, color: C.text }}>Week</th>
-                    <th style={{ textAlign: "left", padding: "8px 8px", fontWeight: 600, color: C.text }}>Winner</th>
-                    <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 100, color: C.text }}>Points</th>
-                    <th style={{ textAlign: "right", padding: "8px 8px", fontWeight: 600, width: 80, color: C.text }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
-                    const entry = weekWinners[w];
-                    if (!entry) return null;
-                    return (
-                      <tr key={w} style={{ borderBottom: `1px solid ${C.borderLight}` }}
-                        onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
-                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                        <td style={{ padding: "10px 8px", color: C.textMuted, fontWeight: 500 }}>Week {w}</td>
-                        <td style={{ padding: "10px 8px", fontWeight: 500, color: C.text }}>{entry.teams.join(" & ")}</td>
-                        <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 600, color: C.text }}>{fmtPts(entry.points)}</td>
-                        <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                          {entry.finalized
-                            ? <span style={{ fontSize: 11, color: "green" }}>✓ Final</span>
-                            : <span style={{ fontSize: 11, color: "#ba7517" }}>Pending</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0", textAlign: "center" }}>No weekly winners locked in yet.</div>
-            )}
-          </div>
+          <SeasonGrid
+            liveTeams={liveTeams}
+            weekWinners={weekWinners}
+            snapshots={snapshots}
+            currentWeekNum={currentWeekNum}
+          />
         )}
 
         {/* Commissioner Panel */}
