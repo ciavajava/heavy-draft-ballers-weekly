@@ -734,4 +734,177 @@ export default function App() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
                   <select value={selectedPrevWeek ?? ""} onChange={e => loadPrevWeek(parseInt(e.target.value))}
                     style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 160 }}>
-                    <option value="">Select
+                    <option value="">Select a week</option>
+                    {completedWeeks.map(w => (
+                      <option key={w.week} value={w.week}>Week {w.week} · {w.start} – {w.end}</option>
+                    ))}
+                  </select>
+                  {weekWinners[selectedPrevWeek!] && (
+                    <span style={{ fontSize: 12, color: C.textMuted }}>
+                      Winner: <strong style={{ color: C.text }}>{weekWinners[selectedPrevWeek!].teams.join(" & ")}</strong>
+                      {weekWinners[selectedPrevWeek!].finalized
+                        ? <span style={{ marginLeft: 8, fontSize: 11, color: "green" }}>✓ Final</span>
+                        : <span style={{ marginLeft: 8, fontSize: 11, color: "#ba7517" }}>· Pending finalization</span>}
+                    </span>
+                  )}
+                </div>
+                {prevWeekLoading && <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0" }}>Loading week data from Yahoo...</div>}
+                {prevWeekError && <div style={{ fontSize: 13, color: "#c00", padding: "12px 0" }}>Error: {prevWeekError}</div>}
+                {prevWeekTeams && !prevWeekLoading && (
+                  <BreakdownTable teams={prevWeekTeams} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {view === "winners" && (
+          <SeasonGrid
+            liveScored={scored}
+            snapshots={snapshots}
+            currentWeekNum={currentWeekNum}
+          />
+        )}
+
+        <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
+          <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
+
+          {!commUnlocked ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="password" placeholder="Password" value={commPassword}
+                onChange={e => setCommPassword(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleCommUnlock(); }}
+                style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: `1px solid ${commError ? "#c00" : C.border}`, width: 160 }} />
+              <button onClick={handleCommUnlock} style={btn()}>Unlock</button>
+              {commError && <span style={{ fontSize: 11, color: "#c00" }}>Incorrect password</span>}
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+                {(["history", "sync", "manual"] as const).map(s => (
+                  <button key={s} onClick={() => setCommSection(s)} style={btn(commSection === s)}>
+                    {s === "history" ? "Weekly History" : s === "sync" ? "Sync Now" : "Manual Override"}
+                  </button>
+                ))}
+                <button onClick={() => { setCommUnlocked(false); setCommPassword(""); }}
+                  style={{ ...btn(), marginLeft: "auto", color: C.textFaint, fontSize: 11 }}>
+                  Lock
+                </button>
+              </div>
+
+              {commSection === "history" && (
+                <div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Set weekly winners. Use "+ Team" for ties. All weeks are editable.</div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 80, color: C.text }}>Week</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, color: C.text }}>Winner(s)</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 110, color: C.text }}>Points</th>
+                        <th style={{ width: 90 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
+                        const locked = weekWinners[w];
+                        const draft = weekDrafts[w];
+                        const isEditing = !!draft;
+                        return (
+                          <tr key={w} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                            <td style={{ padding: "10px 8px", color: C.textMuted, fontWeight: 500 }}>Week {w}</td>
+                            <td style={{ padding: "10px 8px" }}>
+                              {isEditing ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  {draft.teams.map((t, idx) => (
+                                    <div key={idx} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                      <select value={t} onChange={e => updateDraftTeam(w, idx, e.target.value)}
+                                        style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: `1px solid ${C.border}`, flex: 1 }}>
+                                        <option value="">— Select team —</option>
+                                        {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+                                      </select>
+                                      {draft.teams.length > 1 && (
+                                        <button onClick={() => removeDraftTeam(w, idx)} style={{ ...btn(false, true), padding: "3px 6px" }}>✕</button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  <button onClick={() => addDraftTeam(w)}
+                                    style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", background: C.btnBg, color: C.textMuted, alignSelf: "flex-start", marginTop: 2 }}>
+                                    + Team
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ color: locked ? C.text : C.textFaint }}>{locked ? locked.teams.join(" & ") : "—"}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 8px" }}>
+                              {isEditing ? (
+                                <input type="number" value={draft.points} onChange={e => setWeekDrafts(d => ({ ...d, [w]: { ...d[w], points: e.target.value } }))}
+                                  placeholder="pts" style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: `1px solid ${C.border}`, width: 80 }} />
+                              ) : (
+                                <span style={{ color: locked ? C.text : C.textFaint }}>{locked ? fmtPts(locked.points) : "—"}</span>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                              {isEditing ? (
+                                <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                                  <button onClick={() => saveWeek(w)}
+                                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 4, border: "none", cursor: "pointer", background: "#111", color: "#fff", fontWeight: 500 }}>Save</button>
+                                  <button onClick={() => setWeekDrafts(d => { const nd = { ...d }; delete nd[w]; return nd; })}
+                                    style={{ fontSize: 11, padding: "4px 8px", borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", background: C.btnBg, color: C.text }}>✕</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => initWeekDraft(w)} style={{ ...btn(), fontSize: 11, padding: "4px 10px" }}>
+                                  {locked ? "Edit" : "Set"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {commSection === "sync" && (
+                <div>
+                  <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual Yahoo sync</div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
+                    The app auto-syncs from Yahoo every 5 minutes. Use this to force an immediate update.
+                  </div>
+                  <button onClick={handleSync} disabled={syncing}
+                    style={{ fontSize: 13, padding: "8px 20px", borderRadius: 6, border: "none", cursor: syncing ? "not-allowed" : "pointer", background: "#111", color: "#fff", fontWeight: 500, opacity: syncing ? 0.6 : 1 }}>
+                    {syncing ? "Syncing..." : "Sync now"}
+                  </button>
+                  {syncResult && <div style={{ marginTop: 12, fontSize: 12, color: syncResult.startsWith("✓") ? "green" : "#c00" }}>{syncResult}</div>}
+                </div>
+              )}
+
+              {commSection === "manual" && (
+                <div>
+                  <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual data override</div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
+                    The app auto-syncs from Yahoo every 5 minutes and locks each week automatically on Monday at 2:45am ET. Use this only as a fallback if the auto-sync is unavailable.
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
+                    To get the data: Yahoo Fantasy → Stat Tracker → League Stats → set to <strong>Week Totals</strong> → select all → copy → paste below.
+                  </div>
+                  <textarea value={manualData} onChange={e => setManualData(e.target.value)} placeholder="Paste Yahoo table here..."
+                    style={{ width: "100%", height: 180, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: `1px solid ${C.border}`, padding: 10, resize: "vertical", background: C.btnBg, color: C.text }} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button onClick={handleManualSave}
+                      style={{ fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer", background: "#111", color: "#fff", fontWeight: 500 }}>
+                      Save & recalculate
+                    </button>
+                    <button onClick={() => { setManualData(""); setManualResult(null); }} style={btn()}>Clear</button>
+                  </div>
+                  {manualResult && <div style={{ marginTop: 10, fontSize: 12, color: manualResult.startsWith("✓") ? "green" : "#c00" }}>{manualResult}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
