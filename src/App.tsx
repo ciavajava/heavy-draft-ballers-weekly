@@ -70,23 +70,21 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-// H2H standings — hardcoded from Yahoo screenshot, will be live-pulled later
 const H2H_STANDINGS = [
-  { name: "Clever Name Here",           w: 24, l: 11, t: 1 },
-  { name: "RL's Some Stars",            w: 22, l: 12, t: 2 },
-  { name: "Uptown Finest",              w: 19, l: 13, t: 4 },
-  { name: "Buudy Mac's Dry Run",        w: 18, l: 15, t: 3 },
-  { name: "Albert's Pujol",             w: 16, l: 15, t: 5 },
-  { name: "Jim Leyland's Lungs",        w: 17, l: 16, t: 3 },
-  { name: "Cleveland Streamers",        w: 16, l: 16, t: 4 },
-  { name: "Squeaky Green Beans",        w: 16, l: 17, t: 3 },
-  { name: "Big League Chew-pacabras",   w: 15, l: 18, t: 3 },
-  { name: "Contreras to popular belief",w: 15, l: 19, t: 2 },
-  { name: "Acuña Matata",              w: 13, l: 19, t: 4 },
-  { name: "Maximum IL",                 w: 7,  l: 27, t: 2 },
+  { name: "Clever Name Here",            w: 24, l: 11, t: 1 },
+  { name: "RL's Some Stars",             w: 22, l: 12, t: 2 },
+  { name: "Uptown Finest",               w: 19, l: 13, t: 4 },
+  { name: "Buudy Mac's Dry Run",         w: 18, l: 15, t: 3 },
+  { name: "Albert's Pujol",              w: 16, l: 15, t: 5 },
+  { name: "Jim Leyland's Lungs",         w: 17, l: 16, t: 3 },
+  { name: "Cleveland Streamers",         w: 16, l: 16, t: 4 },
+  { name: "Squeaky Green Beans",         w: 16, l: 17, t: 3 },
+  { name: "Big League Chew-pacabras",    w: 15, l: 18, t: 3 },
+  { name: "Contreras to popular belief", w: 15, l: 19, t: 2 },
+  { name: "Acuña Matata",               w: 13, l: 19, t: 4 },
+  { name: "Maximum IL",                  w: 7,  l: 27, t: 2 },
 ];
 
-// Sidepot membership
 const SIDEPOT1_TEAMS = new Set([
   "Big League Chew-pacabras",
   "Acuña Matata",
@@ -105,11 +103,9 @@ const SIDEPOT2_TEAMS = new Set([
   "Clever Name Here",
 ]);
 
-// Payout tables
 const PLAYOFF_PRIZES: Record<number, number> = { 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 };
-
 const SIDEPOT1_PAYOUTS: Record<number, number> = { 1: 330, 2: 170, 3: 100 };
-const SIDEPOT2_PAYOUTS: Record<number, number> = { 1: 190, 2: 110 };
+const SIDEPOT2_PAYOUTS: Record<number, number> = { 1: 250, 2: 150 };
 
 const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
   1: [
@@ -162,10 +158,7 @@ function getCurrentWeekNum() {
   return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
 }
 
-function getCurrentWeek() {
-  return WEEK_SCHEDULE[getCurrentWeekNum() - 1];
-}
-
+function getCurrentWeek() { return WEEK_SCHEDULE[getCurrentWeekNum() - 1]; }
 function getCompletedWeeks() {
   const current = getCurrentWeekNum();
   return WEEK_SCHEDULE.filter(w => w.week < current);
@@ -251,6 +244,168 @@ const globalStyle = `
   .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
 `;
 
+// Reusable standings table used for all 3 pots
+function StandingsTable({ rows, prizes, accentColor, accentBg, showPlayoff }: {
+  rows: { name: string; w: number; l: number; t: number; rank: number }[];
+  prizes: Record<number, number>;
+  accentColor: string;
+  accentBg: string;
+  showPlayoff: boolean;
+}) {
+  return (
+    <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
+      <thead>
+        <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 28, color: C.text }}>#</th>
+          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
+          <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L-T</th>
+          {showPlayoff && <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>Playoffs</th>}
+          <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: accentColor, background: accentBg }}>Proj. Winnings</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((team) => {
+          const prize = prizes[team.rank] ?? 0;
+          const inPlayoffs = showPlayoff && team.rank <= 6;
+          const hasBye = showPlayoff && team.rank <= 2;
+          return (
+            <tr key={team.name}
+              style={{ borderBottom: `1px solid ${C.borderLight}` }}
+              onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <td style={{ padding: "10px 8px", color: C.textFaint, fontSize: 12 }}>{team.rank}</td>
+              <td style={{ padding: "10px 8px", fontWeight: prize > 0 ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>
+                {team.name}
+              </td>
+              <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted }}>
+                {team.w}-{team.l}-{team.t}
+              </td>
+              {showPlayoff && (
+                <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                  {hasBye
+                    ? <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "rgba(34,197,94,0.15)", padding: "2px 8px", borderRadius: 10 }}>✓ Bye</span>
+                    : inPlayoffs
+                      ? <span style={{ fontSize: 11, fontWeight: 600, color: "#0369a1", background: "rgba(59,130,246,0.1)", padding: "2px 8px", borderRadius: 10 }}>✓ In</span>
+                      : <span style={{ fontSize: 11, color: C.textFaint }}>—</span>}
+                </td>
+              )}
+              <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: prize > 0 ? 700 : 400, color: prize > 0 ? accentColor : C.textFaint, background: accentBg }}>
+                {fmtMoney(prize)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function PotSection({ title, subtitle, emoji, borderColor, accentColor, accentBg, payoutDesc, children }: {
+  title: string; subtitle: string; emoji: string; borderColor: string;
+  accentColor: string; accentBg: string; payoutDesc: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 36, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: accentBg, borderBottom: `1px solid ${borderColor}`, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: accentColor }}>{emoji} {title}</div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{subtitle}</div>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted }}>{payoutDesc}</div>
+      </div>
+      <div style={{ overflowX: "auto" }}>{children}</div>
+    </div>
+  );
+}
+
+function StandingsTab() {
+  const sorted = [...H2H_STANDINGS].sort((a, b) => b.w - a.w || b.t - a.t);
+
+  // Full 12-team rows
+  const allRows = sorted.map((t, i) => ({ ...t, rank: i + 1 }));
+
+  // SP1 rows — only SP1 members, ranked by H2H position among them
+  const sp1Sorted = sorted.filter(t => SIDEPOT1_TEAMS.has(t.name));
+  const sp1Rows = sp1Sorted.map((t, i) => ({ ...t, rank: i + 1 }));
+
+  // SP2 rows — only SP2 members, ranked by H2H position among them
+  const sp2Sorted = sorted.filter(t => SIDEPOT2_TEAMS.has(t.name));
+  const sp2Rows = sp2Sorted.map((t, i) => ({ ...t, rank: i + 1 }));
+
+  return (
+    <div>
+      {/* Main pot */}
+      <PotSection
+        title="Regular Season & Playoffs"
+        subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
+        emoji="🏆"
+        borderColor="#86efac"
+        accentColor="#15803d"
+        accentBg="rgba(240,253,244,0.8)"
+        payoutDesc={
+          <span>
+            1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each
+          </span>
+        }
+      >
+        <StandingsTable
+          rows={allRows}
+          prizes={PLAYOFF_PRIZES}
+          accentColor="#15803d"
+          accentBg="rgba(240,253,244,0.5)"
+          showPlayoff={true}
+        />
+      </PotSection>
+
+      {/* Side Pot 1 */}
+      <PotSection
+        title="Side Pot #1"
+        subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
+        emoji="💛"
+        borderColor="#fde047"
+        accentColor="#854d0e"
+        accentBg="rgba(254,252,232,0.8)"
+        payoutDesc={
+          <span>
+            1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong>
+          </span>
+        }
+      >
+        <StandingsTable
+          rows={sp1Rows}
+          prizes={SIDEPOT1_PAYOUTS}
+          accentColor="#854d0e"
+          accentBg="rgba(254,252,232,0.5)"
+          showPlayoff={false}
+        />
+      </PotSection>
+
+      {/* Side Pot 2 */}
+      <PotSection
+        title="Side Pot #2"
+        subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
+        emoji="💙"
+        borderColor="#93c5fd"
+        accentColor="#1d4ed8"
+        accentBg="rgba(239,246,255,0.8)"
+        payoutDesc={
+          <span>
+            1st <strong>$250</strong> · 2nd <strong>$150</strong>
+          </span>
+        }
+      >
+        <StandingsTable
+          rows={sp2Rows}
+          prizes={SIDEPOT2_PAYOUTS}
+          accentColor="#1d4ed8"
+          accentBg="rgba(239,246,255,0.5)"
+          showPlayoff={false}
+        />
+      </PotSection>
+    </div>
+  );
+}
+
 function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   teams: ScoredTeam[];
   sortKey: string;
@@ -317,45 +472,25 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
-
   const liveScores: Record<string, number> = {};
   liveScored.forEach(t => { liveScores[t.name] = t.total; });
-
   const allTeamNames = liveScored.map(t => t.name);
-
   const seasonTotals: Record<string, number> = {};
   allTeamNames.forEach(name => {
     let total = 0;
-    completedWeekNums.forEach(w => {
-      const snap = snapshots[w];
-      if (snap && snap[name] != null) total += snap[name];
-    });
+    completedWeekNums.forEach(w => { const snap = snapshots[w]; if (snap && snap[name] != null) total += snap[name]; });
     if (liveScores[name] != null) total += liveScores[name];
     seasonTotals[name] = total;
   });
-
   const sortedTeams = [...allTeamNames].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
-
   const weekHighScores: Record<number, number> = {};
-  completedWeekNums.forEach(w => {
-    const snap = snapshots[w];
-    if (!snap) return;
-    weekHighScores[w] = Math.max(...Object.values(snap));
-  });
-
+  completedWeekNums.forEach(w => { const snap = snapshots[w]; if (!snap) return; weekHighScores[w] = Math.max(...Object.values(snap)); });
   const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
-
-  let kingScore = 0;
-  let kingTeam = "";
-  let kingWeek = 0;
+  let kingScore = 0, kingTeam = "", kingWeek = 0;
   completedWeekNums.forEach(w => {
-    const snap = snapshots[w];
-    if (!snap) return;
-    Object.entries(snap).forEach(([name, pts]) => {
-      if (pts > kingScore) { kingScore = pts; kingTeam = name; kingWeek = w; }
-    });
+    const snap = snapshots[w]; if (!snap) return;
+    Object.entries(snap).forEach(([name, pts]) => { if (pts > kingScore) { kingScore = pts; kingTeam = name; kingWeek = w; } });
   });
-
   const seasonLeader = sortedTeams[0];
   const seasonLeaderTotal = seasonTotals[seasonLeader] ?? 0;
   const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
@@ -387,7 +522,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
           </div>
         )}
       </div>
-
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
           <thead>
@@ -429,8 +563,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                   const score = isCurrentWeek ? liveScores[name] : snap?.[name];
                   const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
                   const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
-                  let cellBg = "transparent";
-                  let cellColor = C.text;
+                  let cellBg = "transparent", cellColor = C.text;
                   let cellWeight: React.CSSProperties["fontWeight"] = 400;
                   if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
                   else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
@@ -442,142 +575,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                 })}
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function StandingsTab() {
-  // Sort H2H by wins desc, then ties desc as tiebreaker
-  const sorted = [...H2H_STANDINGS].sort((a, b) => b.w - a.w || b.t - a.t);
-
-  // Sidepot rankings — rank among members only by overall H2H finish
-  const sp1Rank: Record<string, number> = {};
-  const sp2Rank: Record<string, number> = {};
-  let sp1Counter = 1;
-  let sp2Counter = 1;
-  sorted.forEach(t => {
-    if (SIDEPOT1_TEAMS.has(t.name)) { sp1Rank[t.name] = sp1Counter++; }
-    if (SIDEPOT2_TEAMS.has(t.name)) { sp2Rank[t.name] = sp2Counter++; }
-  });
-
-  const sp1Count = SIDEPOT1_TEAMS.size;
-  const sp2Count = SIDEPOT2_TEAMS.size;
-
-  return (
-    <div>
-      {/* Prize pool info banners */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #86efac" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d", marginBottom: 6 }}>🏆 Playoff Prize Pool</div>
-          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
-            <div>1st — <strong style={{ color: C.text }}>$475</strong></div>
-            <div>2nd — <strong style={{ color: C.text }}>$275</strong></div>
-            <div>3rd — <strong style={{ color: C.text }}>$150</strong></div>
-            <div>4th–6th — <strong style={{ color: C.text }}>$25</strong> each</div>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#fefce8", border: "1px solid #fde047" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#854d0e", marginBottom: 6 }}>💛 Side Pot #1 ({sp1Count} teams)</div>
-          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
-            <div>1st — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[1])}</strong></div>
-            <div>2nd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[2])}</strong></div>
-            <div>3rd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT1_PAYOUTS[3])}</strong></div>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 200, padding: "12px 16px", borderRadius: 8, background: "#eff6ff", border: "1px solid #93c5fd" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#1d4ed8", marginBottom: 6 }}>💙 Side Pot #2 ({sp2Count} teams)</div>
-          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.8 }}>
-            <div>1st — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT2_PAYOUTS[1])}</strong></div>
-            <div>2nd — <strong style={{ color: C.text }}>{fmtMoney(SIDEPOT2_PAYOUTS[2])}</strong></div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
-        H2H standings · Playoff spots: top 6 · Byes: top 2 · Projected payouts based on current standings
-      </div>
-
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
-          <thead>
-            <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-              <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, width: 28, color: C.text }}>#</th>
-              <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, minWidth: 160, color: C.text }}>Team</th>
-              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>W-L-T</th>
-              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: C.text }}>Playoffs</th>
-              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: "#854d0e" }}>SP1 Rank</th>
-              <th style={{ textAlign: "center", padding: "6px 8px", fontWeight: 600, color: "#1d4ed8" }}>SP2 Rank</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: C.text }}>Proj. Playoff $</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: "#854d0e" }}>Proj. SP1 $</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, color: "#1d4ed8" }}>Proj. SP2 $</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>Total Proj. $</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((team, idx) => {
-              const rank = idx + 1;
-              const inPlayoffs = rank <= 6;
-              const hasBye = rank <= 2;
-              const inSP1 = SIDEPOT1_TEAMS.has(team.name);
-              const inSP2 = SIDEPOT2_TEAMS.has(team.name);
-              const playoffPrize = inPlayoffs ? (PLAYOFF_PRIZES[rank] ?? 0) : 0;
-              const sp1Prize = inSP1 ? (SIDEPOT1_PAYOUTS[sp1Rank[team.name]] ?? 0) : 0;
-              const sp2Prize = inSP2 ? (SIDEPOT2_PAYOUTS[sp2Rank[team.name]] ?? 0) : 0;
-              const total = playoffPrize + sp1Prize + sp2Prize;
-
-              const rowBg = hasBye
-                ? "rgba(34,197,94,0.06)"
-                : inPlayoffs
-                  ? "rgba(34,197,94,0.03)"
-                  : "transparent";
-
-              return (
-                <tr key={team.name}
-                  style={{ borderBottom: `1px solid ${C.borderLight}`, background: rowBg }}
-                  onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
-                  onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
-                  <td style={{ padding: "10px 8px", color: C.textFaint, fontSize: 12 }}>{rank}</td>
-                  <td style={{ padding: "10px 8px", fontWeight: inPlayoffs ? 600 : 400, color: C.text, whiteSpace: "nowrap" }}>
-                    {team.name}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "center", color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>
-                    {team.w}-{team.l}-{team.t}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                    {hasBye
-                      ? <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "rgba(34,197,94,0.15)", padding: "2px 8px", borderRadius: 10 }}>✓ Bye</span>
-                      : inPlayoffs
-                        ? <span style={{ fontSize: 11, fontWeight: 600, color: "#0369a1", background: "rgba(59,130,246,0.1)", padding: "2px 8px", borderRadius: 10 }}>✓ In</span>
-                        : <span style={{ fontSize: 11, color: C.textFaint }}>—</span>}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                    {inSP1
-                      ? <span style={{ fontSize: 12, fontWeight: 600, color: "#854d0e" }}>#{sp1Rank[team.name]}</span>
-                      : <span style={{ color: C.textFaint }}>—</span>}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                    {inSP2
-                      ? <span style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8" }}>#{sp2Rank[team.name]}</span>
-                      : <span style={{ color: C.textFaint }}>—</span>}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", color: playoffPrize > 0 ? "#15803d" : C.textFaint, fontWeight: playoffPrize > 0 ? 600 : 400 }}>
-                    {fmtMoney(playoffPrize)}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", color: sp1Prize > 0 ? "#854d0e" : C.textFaint, fontWeight: sp1Prize > 0 ? 600 : 400 }}>
-                    {inSP1 ? fmtMoney(sp1Prize) : <span style={{ color: C.textFaint }}>N/A</span>}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", color: sp2Prize > 0 ? "#1d4ed8" : C.textFaint, fontWeight: sp2Prize > 0 ? 600 : 400 }}>
-                    {inSP2 ? fmtMoney(sp2Prize) : <span style={{ color: C.textFaint }}>N/A</span>}
-                  </td>
-                  <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700, color: total > 0 ? C.text : C.textFaint, background: "var(--bg-alt,#f9f9f9)" }}>
-                    {fmtMoney(total)}
-                  </td>
-                </tr>
-              );
-            })}
           </tbody>
         </table>
       </div>
