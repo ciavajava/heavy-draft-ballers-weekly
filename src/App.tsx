@@ -322,7 +322,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
     <div>
       {/* Two-panel banner */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        {/* King of the hill */}
         {kingTeam && (
           <div style={{
             flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
@@ -339,7 +338,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
             </div>
           </div>
         )}
-        {/* Season leader */}
         {seasonLeader && (
           <div style={{
             flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12,
@@ -357,32 +355,25 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
         )}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
-          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#d97706", opacity: 0.85 }} />
-          Week winner (final)
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textMuted }}>
-          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#3b82f6", opacity: 0.7 }} />
-          Current week leader
-        </div>
-      </div>
-
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 12, minWidth: 600 }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${C.border}` }}>
-              <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1 }}>Team</th>
-              {/* Season total column with light grey background */}
-              <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap", background: "var(--bg-alt,#f9f9f9)" }}>Season Total</th>
+              {/* Team + Season Total headers — verticalAlign top to match week headers */}
+              <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1, verticalAlign: "top" }}>Team</th>
+              <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap", background: "var(--bg-alt,#f9f9f9)", verticalAlign: "top" }}>Season Total</th>
               {visibleWeeks.map(w => {
                 const isCurrentWeek = w === currentWeekNum;
                 const isFuture = w > currentWeekNum;
                 const sched = WEEK_SCHEDULE[w - 1];
                 return (
-                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap" }}>
-                    {isCurrentWeek && <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>}
+                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap", verticalAlign: "top" }}>
+                    {isCurrentWeek && (
+                      <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div>
+                    )}
+                    {!isCurrentWeek && (
+                      <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>
+                    )}
                     <div>Wk {w}</div>
                     {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
                   </th>
@@ -396,12 +387,10 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                 <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
                   onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                  {/* Left-justified team name, no star */}
                   <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text, textAlign: "left" }}>
                     <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
                     <span>{name}</span>
                   </td>
-                  {/* Season total cell with grey background */}
                   <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>
                     {fmtPts(seasonTotals[name] ?? 0)}
                   </td>
@@ -416,7 +405,6 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
                     let cellBg = "transparent";
                     let cellColor = C.text;
                     let cellWeight: React.CSSProperties["fontWeight"] = 400;
-                    // Green for confirmed week winners, blue for current week leader
                     if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
                     else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
 
