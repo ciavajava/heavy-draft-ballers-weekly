@@ -238,6 +238,7 @@ const globalStyle = `
   .flash-bg-down{animation:flashBgRed 3s ease-out forwards;}
   .flash-txt-up{animation:flashTxtGreen 3s ease-out forwards;}
   .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
+  .pot-header{background:var(--pot-header-bg,rgba(0,0,0,0.15));border-bottom:1px solid var(--pot-header-border);}
 `;
 
 function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
@@ -461,18 +462,24 @@ function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, sho
   );
 }
 
-function PotSection({ title, subtitle, emoji, borderColor, accentColor, accentBg, payoutDesc, children }: {
+function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDesc, children }: {
   title: string; subtitle: string; emoji: string; borderColor: string;
-  accentColor: string; accentBg: string; payoutDesc: React.ReactNode; children: React.ReactNode;
+  accentColor: string; payoutDesc: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div style={{ marginBottom: 36, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
-      <div style={{ background: accentBg, borderBottom: `1px solid ${borderColor}`, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+      {/* Header uses CSS variable background so it adapts to dark mode */}
+      <div style={{
+        background: "var(--bg-alt,#f9f9f9)",
+        borderBottom: `1px solid ${borderColor}`,
+        padding: "14px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
+      }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: accentColor }}>{emoji} {title}</div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3 }}>{subtitle}</div>
+          <div style={{ fontSize: 12, color: C.text, marginTop: 3, opacity: 0.8 }}>{subtitle}</div>
         </div>
-        <div style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{payoutDesc}</div>
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{payoutDesc}</div>
       </div>
       <div style={{ overflowX: "auto" }}>{children}</div>
     </div>
@@ -493,21 +500,21 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
       )}
       <PotSection
         title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
-        emoji="🏆" borderColor="#86efac" accentColor="#15803d" accentBg="rgba(240,253,244,0.9)"
+        emoji="🏆" borderColor="#86efac" accentColor="#15803d"
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}
       >
         <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
       <PotSection
         title="Side Pot #1" subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
-        emoji="💛" borderColor="#fde047" accentColor="#854d0e" accentBg="rgba(254,252,232,0.9)"
+        emoji="💛" borderColor="#fde047" accentColor="#854d0e"
         payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}
       >
         <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
       <PotSection
         title="Side Pot #2" subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
-        emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8" accentBg="rgba(239,246,255,0.9)"
+        emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}
       >
         <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
@@ -636,8 +643,7 @@ export default function App() {
   const scored = computeRoto(liveTeams);
   const teamNames = scored.map(t => t.name);
   const handleSort = (key: string) => {
-    if (sortKey === key) setSortAsc(a => !a);
-    else { setSortKey(key); setSortAsc(false); }
+    if (sortKey === key) setSortAsc(a => !a); else { setSortKey(key); setSortAsc(false); }
   };
   const displayTeams = selectedWeek === null ? scored : prevWeekTeams;
   const displayWinner = selectedWeek !== null ? weekWinners[selectedWeek] : weekWinners[currentWeekNum];
@@ -655,8 +661,7 @@ export default function App() {
       const nums: number[] = [];
       while (nums.length < 14 && i < dataLines.length) {
         const val = dataLines[i].replace(",", ".");
-        if (!isNaN(parseFloat(val)) || val.startsWith(".")) { nums.push(parseFloat(val)); i++; }
-        else break;
+        if (!isNaN(parseFloat(val)) || val.startsWith(".")) { nums.push(parseFloat(val)); i++; } else break;
       }
       if (nums.length === 14 && name && !/^\d+$/.test(name))
         teams.push({ name, r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13] });
@@ -695,8 +700,7 @@ export default function App() {
   };
 
   const handleCommUnlock = () => {
-    if (commPassword === COMM_PASSWORD) { setCommUnlocked(true); setCommError(false); }
-    else setCommError(true);
+    if (commPassword === COMM_PASSWORD) { setCommUnlocked(true); setCommError(false); } else setCommError(true);
   };
 
   const initWeekDraft = (w: number) => {
