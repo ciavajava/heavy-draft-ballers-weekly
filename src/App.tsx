@@ -108,8 +108,8 @@ const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
     { pts: 57.5 }, { pts: 57.5 },
   ],
   2: [
-    { pts: 120 }, { pts: 100.5 }, { pts: 92 }, { pts: 84.5 }, { pts: 79.5 },
-    { pts: 77.5 }, { pts: 72 }, { pts: 71 }, { pts: 65 }, { pts: 61.5 },
+    { pts: 120 },  { pts: 100.5 }, { pts: 92 },   { pts: 84.5 }, { pts: 79.5 },
+    { pts: 77.5 }, { pts: 72 },    { pts: 71 },   { pts: 65 },   { pts: 61.5 },
     { pts: 57.5 }, { pts: 55 },
   ],
 };
@@ -313,7 +313,11 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
               <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
               {CATS.map(c => (
                 <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
-                  <span className={flashMap[`${t.name}__stat__${c.key}`] || ""} style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text }}>
+                  <span
+                    className={flashMap[`${t.name}__stat__${c.key}`] || ""}
+                    title={c.key === "avg" && t.hab ? `${t.hab} · ${parseHab(t.hab).avg.toFixed(6)}` : undefined}
+                    style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text, cursor: c.key === "avg" && t.hab ? "help" : "default" }}
+                  >
                     {c.fmt(t[c.key as keyof Team] as number)}
                   </span>
                   <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
