@@ -108,9 +108,9 @@ const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
     { pts: 57.5 }, { pts: 57.5 },
   ],
   2: [
-    { pts: 120 }, { pts: 100.5 }, { pts: 92 }, { pts: 85 }, { pts: 79.5 },
+    { pts: 120 }, { pts: 100.5 }, { pts: 92 }, { pts: 84.5 }, { pts: 79.5 },
     { pts: 77.5 }, { pts: 72 }, { pts: 71 }, { pts: 65 }, { pts: 61.5 },
-    { pts: 57.5 }, { pts: 54.5 },
+    { pts: 57.5 }, { pts: 55 },
   ],
 };
 
