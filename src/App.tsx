@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 
 const DEFAULT_DATA = [
-  { name: "RL's Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3 },
-  { name: "Big League Chew-pacabras", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1 },
-  { name: "Cleveland Streamers", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2 },
-  { name: "Clever Name Here", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4 },
-  { name: "Jim Leyland's Lungs", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2 },
-  { name: "Albert's Pujol", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1 },
-  { name: "Acuña Matata", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0 },
-  { name: "Buudy Mac's Dry Run", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2 },
-  { name: "Contreras to popular belief", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1 },
-  { name: "Uptown Finest", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2 },
-  { name: "Squeaky Green Beans", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0 },
-  { name: "Maximum IL", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1 },
+  { name: "RL's Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
+  { name: "Big League Chew-pacabras", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1, hab: "" },
+  { name: "Cleveland Streamers", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2, hab: "" },
+  { name: "Clever Name Here", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4, hab: "" },
+  { name: "Jim Leyland's Lungs", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
+  { name: "Albert's Pujol", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
+  { name: "Acuña Matata", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
+  { name: "Buudy Mac's Dry Run", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
+  { name: "Contreras to popular belief", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
+  { name: "Uptown Finest", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2, hab: "" },
+  { name: "Squeaky Green Beans", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0, hab: "" },
+  { name: "Maximum IL", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1, hab: "" },
 ];
 
 const CATS = [
@@ -157,7 +157,11 @@ function getCompletedWeeks() {
   return WEEK_SCHEDULE.filter(w => w.week < current);
 }
 
-type Team = { name: string; r: number; hr: number; rbi: number; sb: number; avg: number; ops: number; w: number; k: number; era: number; whip: number; qs: number; svh: number };
+type Team = {
+  name: string; r: number; hr: number; rbi: number; sb: number;
+  avg: number; ops: number; w: number; k: number; era: number;
+  whip: number; qs: number; svh: number; hab: string;
+};
 type ScoredTeam = Team & { pts: Record<string, number>; total: number };
 type WeekWinner = { week: number; teams: string[]; points: number; finalized?: boolean };
 
@@ -166,6 +170,15 @@ const TIMESTAMP_KEY = "roto_last_updated";
 const WEEK_PREFIX = "roto_week_";
 const SNAPSHOT_PREFIX = "roto_week_";
 const H2H_KEY = "roto_h2h_standings";
+
+function parseHab(habStr: string): { h: number; ab: number; avg: number } {
+  if (!habStr || typeof habStr !== "string") return { h: 0, ab: 0, avg: 0 };
+  const parts = habStr.split("/");
+  if (parts.length !== 2) return { h: 0, ab: 0, avg: 0 };
+  const h = parseInt(parts[0]) || 0;
+  const ab = parseInt(parts[1]) || 0;
+  return { h, ab, avg: ab > 0 ? h / ab : 0 };
+}
 
 function scoreCategory(teams: Team[], cat: typeof CATS[0]) {
   const n = teams.length;
@@ -183,9 +196,32 @@ function scoreCategory(teams: Team[], cat: typeof CATS[0]) {
   return scores;
 }
 
+function scoreAvgCategory(teams: Team[]): Record<string, number> {
+  const n = teams.length;
+  const teamsWithRaw = teams.map(t => ({ ...t, rawAvg: parseHab(t.hab).avg }));
+  const sorted = [...teamsWithRaw].sort((a, b) => b.rawAvg - a.rawAvg);
+  const scores: Record<string, number> = {};
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j < sorted.length && sorted[j].rawAvg === sorted[i].rawAvg) j++;
+    const ranks = Array.from({ length: j - i }, (_, k) => n - (i + k));
+    const avg = ranks.reduce((s, r) => s + r, 0) / ranks.length;
+    for (let k = i; k < j; k++) scores[sorted[k].name] = avg;
+    i = j;
+  }
+  return scores;
+}
+
 function computeRoto(teams: Team[]): ScoredTeam[] {
   const catScores: Record<string, Record<string, number>> = {};
-  CATS.forEach(cat => { catScores[cat.key] = scoreCategory(teams, cat); });
+  CATS.forEach(cat => {
+    if (cat.key === "avg") {
+      catScores[cat.key] = scoreAvgCategory(teams);
+    } else {
+      catScores[cat.key] = scoreCategory(teams, cat);
+    }
+  });
   return teams.map(t => {
     const pts: Record<string, number> = {};
     let total = 0;
@@ -238,7 +274,6 @@ const globalStyle = `
   .flash-bg-down{animation:flashBgRed 3s ease-out forwards;}
   .flash-txt-up{animation:flashTxtGreen 3s ease-out forwards;}
   .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
-  .pot-header{background:var(--pot-header-bg,rgba(0,0,0,0.15));border-bottom:1px solid var(--pot-header-border);}
 `;
 
 function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
@@ -326,7 +361,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {kingTeam && (
-          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "#fffbeb", border: "1px solid #f59e0b" }}>
+          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "var(--bg-alt,#f9f9f9)", border: "1px solid #f59e0b" }}>
             <span style={{ fontSize: 20 }}>👑</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#b45309" }}>One-Week Score to Beat</div>
@@ -338,7 +373,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
           </div>
         )}
         {seasonLeader && (
-          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #86efac" }}>
+          <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "var(--bg-alt,#f9f9f9)", border: "1px solid #86efac" }}>
             <span style={{ fontSize: 20 }}>🏆</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d" }}>Season Total Leader</div>
@@ -468,13 +503,7 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
 }) {
   return (
     <div style={{ marginBottom: 36, border: `1px solid ${borderColor}`, borderRadius: 10, overflow: "hidden" }}>
-      {/* Header uses CSS variable background so it adapts to dark mode */}
-      <div style={{
-        background: "var(--bg-alt,#f9f9f9)",
-        borderBottom: `1px solid ${borderColor}`,
-        padding: "14px 16px",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
-      }}>
+      <div style={{ background: "var(--bg-alt,#f9f9f9)", borderBottom: `1px solid ${borderColor}`, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: accentColor }}>{emoji} {title}</div>
           <div style={{ fontSize: 12, color: C.text, marginTop: 3, opacity: 0.8 }}>{subtitle}</div>
@@ -490,7 +519,6 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
   const allRows = h2h.map((t, i) => ({ ...t, rank: i + 1 }));
   const sp1Rows = h2h.filter(t => SIDEPOT1_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
   const sp2Rows = h2h.filter(t => SIDEPOT2_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
-
   return (
     <div>
       {h2hUpdatedAt && (
@@ -664,7 +692,7 @@ export default function App() {
         if (!isNaN(parseFloat(val)) || val.startsWith(".")) { nums.push(parseFloat(val)); i++; } else break;
       }
       if (nums.length === 14 && name && !/^\d+$/.test(name))
-        teams.push({ name, r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13] });
+        teams.push({ name, r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13], hab: "" });
     }
     return teams;
   };
@@ -739,7 +767,6 @@ export default function App() {
     <>
       <style>{globalStyle}</style>
       <div style={{ padding: "24px 20px", maxWidth: 1100, margin: "0 auto", fontFamily: "system-ui,sans-serif", color: C.text, background: C.bg, minHeight: "100vh" }}>
-
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
           <div>
             <div style={{ fontSize: 22, fontWeight: 600, color: C.text }}>Heavy Draft Ballers Prize Tracker</div>
