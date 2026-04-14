@@ -89,7 +89,7 @@ const FALLBACK_H2H: H2HTeam[] = [
 
 const SIDEPOT1_TEAMS = new Set([
   "Big League Chew-pacabras", "Cleveland Streamers", "Buudy Mac's Dry Run",
-  "Albert's Pujol", "Squeaky Green Beans", "Contreras to popular belief",
+  "Albert\u2019s Pujol", "Squeaky Green Beans", "Contreras to popular belief",
   "Maximum IL", "Clever Name Here",
 ]);
 
