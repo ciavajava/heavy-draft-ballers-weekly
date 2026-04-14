@@ -30,6 +30,8 @@ const CATS = [
   { key: "svh",  label: "SVH",  dir: 1,  fmt: (v: number) => v },
 ];
 
+const RATIO_CATS = ["avg", "ops", "era", "whip"];
+
 const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
@@ -71,6 +73,7 @@ const WEEK_STARTS = [
 ];
 
 type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
+type Override = { teamA: string; teamB: string; category: string; winner: string };
 
 const FALLBACK_H2H: H2HTeam[] = [
   { name: "Clever Name Here",            w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
@@ -228,6 +231,13 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
     CATS.forEach(cat => { pts[cat.key] = catScores[cat.key][t.name]; total += pts[cat.key]; });
     return { ...t, pts, total };
   }).sort((a, b) => b.total - a.total);
+}
+
+// Compute head-to-head category result between two teams given their roto scores
+function getCatResult(catKey: string, ptsA: number, ptsB: number): "win" | "loss" | "tie" {
+  if (ptsA > ptsB) return "win";
+  if (ptsB > ptsA) return "loss";
+  return "tie";
 }
 
 function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
@@ -446,11 +456,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 
 function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, showPlayoff }: {
   rows: { name: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number }[];
-  prizes: Record<number, number>;
-  accentColor: string;
-  accentBg: string;
-  accentBorder: string;
-  showPlayoff: boolean;
+  prizes: Record<number, number>; accentColor: string; accentBg: string; accentBorder: string; showPlayoff: boolean;
 }) {
   return (
     <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
@@ -530,27 +536,170 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
           H2H standings last synced {toEastern(h2hUpdatedAt)}
         </div>
       )}
-      <PotSection
-        title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
+      <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
         emoji="🏆" borderColor="#86efac" accentColor="#15803d"
-        payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}
-      >
+        payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
         <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
-      <PotSection
-        title="Side Pot #1" subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
+      <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
         emoji="💛" borderColor="#fde047" accentColor="#854d0e"
-        payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}
-      >
+        payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}>
         <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
-      <PotSection
-        title="Side Pot #2" subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
+      <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
         emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8"
-        payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}
-      >
+        payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
         <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
+    </div>
+  );
+}
+
+// Commissioner override section
+function OverridesSection() {
+  const completedWeeks = getCompletedWeeks();
+  const currentWeekNum = getCurrentWeekNum();
+  const allWeeks = [...completedWeeks, WEEK_SCHEDULE[currentWeekNum - 1]].filter(Boolean);
+
+  const [selectedWeek, setSelectedWeek] = useState<number>(currentWeekNum);
+  const [matchups, setMatchups] = useState<{ teamA: string; teamB: string }[]>([]);
+  const [catstats, setCatstats] = useState<Record<string, Record<string, number>>>({});
+  const [overrides, setOverrides] = useState<Override[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const loadWeekData = async (week: number) => {
+    setLoading(true);
+    setSaveStatus(null);
+    const [matchupsVal, catstatsVal, overridesVal] = await Promise.all([
+      kvGet("roto_week_" + week + "_matchups"),
+      kvGet("roto_week_" + week + "_catstats"),
+      kvGet("roto_week_" + week + "_overrides"),
+    ]);
+    setMatchups(matchupsVal ? JSON.parse(matchupsVal) : []);
+    setCatstats(catstatsVal ? JSON.parse(catstatsVal) : {});
+    setOverrides(overridesVal ? JSON.parse(overridesVal) : []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadWeekData(selectedWeek); }, [selectedWeek]);
+
+  const getOverride = (teamA: string, teamB: string, cat: string): string | null => {
+    const o = overrides.find(o =>
+      ((o.teamA === teamA && o.teamB === teamB) || (o.teamA === teamB && o.teamB === teamA)) &&
+      o.category === cat
+    );
+    return o?.winner ?? null;
+  };
+
+  const setOverride = async (teamA: string, teamB: string, cat: string, winner: string) => {
+    const next = overrides.filter(o =>
+      !(((o.teamA === teamA && o.teamB === teamB) || (o.teamA === teamB && o.teamB === teamA)) && o.category === cat)
+    );
+    if (winner !== "computed") {
+      next.push({ teamA, teamB, category: cat, winner });
+    }
+    setOverrides(next);
+    await kvSet("roto_week_" + selectedWeek + "_overrides", JSON.stringify(next));
+    setSaveStatus("✓ Saved — hit Sync Now to update standings");
+  };
+
+  const computedResult = (teamA: string, teamB: string, cat: string): "win" | "loss" | "tie" => {
+    const ptsA = catstats[teamA]?.[cat] ?? 0;
+    const ptsB = catstats[teamB]?.[cat] ?? 0;
+    return getCatResult(cat, ptsA, ptsB);
+  };
+
+  const resultLabel = (result: "win" | "loss" | "tie", teamA: string, teamB: string, perspective: "A" | "B") => {
+    if (result === "tie") return "Tie";
+    if (perspective === "A") return result === "win" ? `${teamA} wins` : `${teamB} wins`;
+    return result === "loss" ? `${teamB} wins` : `${teamA} wins`;
+  };
+
+  const resultColor = (result: "win" | "loss" | "tie", perspective: "A") => {
+    if (result === "tie") return C.textMuted;
+    return result === "win" ? "#15803d" : "#c00";
+  };
+
+  if (loading) return <div style={{ fontSize: 13, color: C.textMuted, padding: "16px 0" }}>Loading week data...</div>;
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
+        Override ratio category results when Yahoo's tiebreaker differs from our computed result. Changes take effect after Sync Now.
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
+        <select
+          value={selectedWeek}
+          onChange={e => setSelectedWeek(parseInt(e.target.value))}
+          style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 200 }}>
+          {allWeeks.slice().reverse().map(w => (
+            <option key={w.week} value={w.week}>Week {w.week} · {w.start} – {w.end}</option>
+          ))}
+        </select>
+        {saveStatus && <span style={{ fontSize: 12, color: "#15803d" }}>{saveStatus}</span>}
+      </div>
+
+      {matchups.length === 0 && (
+        <div style={{ fontSize: 13, color: C.textFaint }}>No matchup data available for this week yet.</div>
+      )}
+
+      {matchups.map(({ teamA, teamB }) => (
+        <div key={teamA + teamB} style={{ marginBottom: 24, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ background: C.bgAlt, padding: "10px 14px", fontSize: 13, fontWeight: 600, color: C.text, borderBottom: `1px solid ${C.border}` }}>
+            {teamA} vs {teamB}
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                <th style={{ textAlign: "left", padding: "6px 14px", fontWeight: 600, color: C.text, width: 60 }}>Cat</th>
+                <th style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600, color: C.text }}>Computed</th>
+                <th style={{ textAlign: "center", padding: "6px 10px", fontWeight: 600, color: C.text }}>Override</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RATIO_CATS.map(cat => {
+                const computed = computedResult(teamA, teamB, cat);
+                const override = getOverride(teamA, teamB, cat);
+                const catLabel = CATS.find(c => c.key === cat)?.label ?? cat.toUpperCase();
+                const ptsA = catstats[teamA]?.[cat] ?? 0;
+                const ptsB = catstats[teamB]?.[cat] ?? 0;
+
+                let computedText = "";
+                if (computed === "tie") computedText = "Tie";
+                else if (computed === "win") computedText = teamA + " wins";
+                else computedText = teamB + " wins";
+
+                return (
+                  <tr key={cat} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: "10px 14px", fontWeight: 600, color: C.text }}>{catLabel}</td>
+                    <td style={{ padding: "10px 10px", textAlign: "center" }}>
+                      <span style={{ color: computed === "tie" ? C.textMuted : "#15803d", fontSize: 12 }}>
+                        {computedText}
+                      </span>
+                      <span style={{ display: "block", fontSize: 10, color: C.textFaint, marginTop: 2 }}>
+                        {fmtPts(ptsA)} pts vs {fmtPts(ptsB)} pts
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 10px", textAlign: "center" }}>
+                      <select
+                        value={override ?? "computed"}
+                        onChange={e => setOverride(teamA, teamB, cat, e.target.value)}
+                        style={{ fontSize: 12, padding: "4px 8px", borderRadius: 4, border: `1px solid ${override ? "#f59e0b" : C.border}`, background: override ? "rgba(251,191,36,0.1)" : C.btnBg, color: C.text }}>
+                        <option value="computed">— Use computed —</option>
+                        <option value={teamA}>{teamA} wins</option>
+                        <option value={teamB}>{teamB} wins</option>
+                        <option value="tie">Tie</option>
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }
@@ -578,7 +727,7 @@ export default function App() {
   const [commUnlocked, setCommUnlocked] = useState(false);
   const [commPassword, setCommPassword] = useState("");
   const [commError, setCommError] = useState(false);
-  const [commSection, setCommSection] = useState<"history" | "sync" | "manual">("history");
+  const [commSection, setCommSection] = useState<"history" | "sync" | "overrides" | "manual">("history");
   const [weekDrafts, setWeekDrafts] = useState<Record<number, { teams: string[]; points: string }>>({});
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -788,8 +937,7 @@ export default function App() {
         {view === "weekly" && (
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-              <select
-                value={selectedWeek === null ? "current" : String(selectedWeek)}
+              <select value={selectedWeek === null ? "current" : String(selectedWeek)}
                 onChange={e => handleWeekSelect(e.target.value === "current" ? null : parseInt(e.target.value))}
                 style={{ fontSize: 13, padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, minWidth: 200 }}>
                 <option value="current">Week {currentWeekNum} · {currentWeekSched?.start} – {currentWeekSched?.end} (Current)</option>
@@ -818,10 +966,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "grid" && (
-          <SeasonGrid liveScored={scored} snapshots={snapshots} currentWeekNum={currentWeekNum} />
-        )}
-
+        {view === "grid" && <SeasonGrid liveScored={scored} snapshots={snapshots} currentWeekNum={currentWeekNum} />}
         {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} />}
 
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
@@ -838,9 +983,9 @@ export default function App() {
           ) : (
             <div>
               <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-                {(["history", "sync", "manual"] as const).map(s => (
+                {(["history", "sync", "overrides", "manual"] as const).map(s => (
                   <button key={s} onClick={() => setCommSection(s)} style={btn(commSection === s)}>
-                    {s === "history" ? "Weekly History" : s === "sync" ? "Sync Now" : "Manual Override"}
+                    {s === "history" ? "Weekly History" : s === "sync" ? "Sync Now" : s === "overrides" ? "Category Overrides" : "Manual Override"}
                   </button>
                 ))}
                 <button onClick={() => { setCommUnlocked(false); setCommPassword(""); }}
@@ -932,6 +1077,8 @@ export default function App() {
                   {syncResult && <div style={{ marginTop: 12, fontSize: 12, color: syncResult.startsWith("✓") ? "green" : "#c00" }}>{syncResult}</div>}
                 </div>
               )}
+
+              {commSection === "overrides" && <OverridesSection />}
 
               {commSection === "manual" && (
                 <div>
