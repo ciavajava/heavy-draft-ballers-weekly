@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 
 const DEFAULT_DATA = [
-  { name: "RL's Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
+  { name: "RL\u2019s Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
   { name: "Big League Chew-pacabras", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1, hab: "" },
   { name: "Cleveland Streamers", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2, hab: "" },
   { name: "Clever Name Here", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4, hab: "" },
-  { name: "Jim Leyland's Lungs", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
-  { name: "Albert's Pujol", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
-  { name: "Acuña Matata", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
-  { name: "Buudy Mac's Dry Run", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
-  { name: "Contreras to popular belief", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
+  { name: "Jim Leyland\u2019s Lungs", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
+  { name: "Albert\u2019s Pujol", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
+  { name: "Acu\u00f1a Matata", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
+  { name: "Buudy Mac\u2019s Dry Run", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
+  { name: "Raleigh The Troops", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
   { name: "Uptown Finest", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2, hab: "" },
   { name: "Squeaky Green Beans", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0, hab: "" },
   { name: "Maximum IL", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1, hab: "" },
@@ -73,28 +73,28 @@ const WEEK_STARTS = [
 type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
 
 const FALLBACK_H2H: H2HTeam[] = [
-  { name: "Clever Name Here",            w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
-  { name: "RL's Some Stars",             w: 22, l: 12, t: 2, winPct: 0.639, gb: 2 },
-  { name: "Uptown Finest",               w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5 },
-  { name: "Buudy Mac's Dry Run",         w: 18, l: 15, t: 3, winPct: 0.542, gb: 6 },
-  { name: "Albert's Pujol",              w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5 },
-  { name: "Jim Leyland's Lungs",         w: 17, l: 16, t: 3, winPct: 0.514, gb: 7 },
-  { name: "Cleveland Streamers",         w: 16, l: 16, t: 4, winPct: 0.500, gb: 8 },
-  { name: "Squeaky Green Beans",         w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5 },
-  { name: "Big League Chew-pacabras",    w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5 },
-  { name: "Contreras to popular belief", w: 15, l: 19, t: 2, winPct: 0.444, gb: 10 },
-  { name: "Acuña Matata",               w: 13, l: 19, t: 4, winPct: 0.417, gb: 11 },
-  { name: "Maximum IL",                  w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17 },
+  { name: "Clever Name Here",         w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
+  { name: "RL\u2019s Some Stars",     w: 22, l: 12, t: 2, winPct: 0.639, gb: 2 },
+  { name: "Uptown Finest",            w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5 },
+  { name: "Buudy Mac\u2019s Dry Run", w: 18, l: 15, t: 3, winPct: 0.542, gb: 6 },
+  { name: "Albert\u2019s Pujol",      w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5 },
+  { name: "Jim Leyland\u2019s Lungs", w: 17, l: 16, t: 3, winPct: 0.514, gb: 7 },
+  { name: "Cleveland Streamers",      w: 16, l: 16, t: 4, winPct: 0.500, gb: 8 },
+  { name: "Squeaky Green Beans",      w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5 },
+  { name: "Big League Chew-pacabras", w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5 },
+  { name: "Raleigh The Troops",       w: 15, l: 19, t: 2, winPct: 0.444, gb: 10 },
+  { name: "Acu\u00f1a Matata",        w: 13, l: 19, t: 4, winPct: 0.417, gb: 11 },
+  { name: "Maximum IL",               w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17 },
 ];
 
 const SIDEPOT1_TEAMS = new Set([
-  "Big League Chew-pacabras", "Cleveland Streamers", "Buudy Mac's Dry Run",
-  "Albert\u2019s Pujol", "Squeaky Green Beans", "Contreras to popular belief",
+  "Big League Chew-pacabras", "Cleveland Streamers", "Buudy Mac\u2019s Dry Run",
+  "Albert\u2019s Pujol", "Squeaky Green Beans", "Raleigh The Troops",
   "Maximum IL", "Clever Name Here",
 ]);
 
 const SIDEPOT2_TEAMS = new Set([
-  "Squeaky Green Beans", "Contreras to popular belief", "Maximum IL", "Clever Name Here",
+  "Squeaky Green Beans", "Raleigh The Troops", "Maximum IL", "Clever Name Here",
 ]);
 
 const PLAYOFF_PRIZES: Record<number, number> = { 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 };
@@ -116,16 +116,16 @@ const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
 
 const SEEDED_SNAPSHOT_NAMES: Record<number, string[]> = {
   1: [
-    "RL's Some Stars", "Big League Chew-pacabras", "Clever Name Here",
-    "Squeaky Green Beans", "Acuña Matata", "Cleveland Streamers",
-    "Albert's Pujol", "Buudy Mac's Dry Run", "Uptown Finest",
-    "Maximum IL", "Contreras to popular belief", "Jim Leyland's Lungs",
+    "RL\u2019s Some Stars", "Big League Chew-pacabras", "Clever Name Here",
+    "Squeaky Green Beans", "Acu\u00f1a Matata", "Cleveland Streamers",
+    "Albert\u2019s Pujol", "Buudy Mac\u2019s Dry Run", "Uptown Finest",
+    "Maximum IL", "Raleigh The Troops", "Jim Leyland\u2019s Lungs",
   ],
   2: [
-    "Squeaky Green Beans", "Clever Name Here", "Contreras to popular belief",
-    "RL's Some Stars", "Maximum IL", "Jim Leyland's Lungs",
-    "Uptown Finest", "Albert's Pujol", "Buudy Mac's Dry Run",
-    "Acuña Matata", "Big League Chew-pacabras", "Cleveland Streamers",
+    "Squeaky Green Beans", "Clever Name Here", "Raleigh The Troops",
+    "RL\u2019s Some Stars", "Maximum IL", "Jim Leyland\u2019s Lungs",
+    "Uptown Finest", "Albert\u2019s Pujol", "Buudy Mac\u2019s Dry Run",
+    "Acu\u00f1a Matata", "Big League Chew-pacabras", "Cleveland Streamers",
   ],
 };
 
@@ -275,6 +275,24 @@ const globalStyle = `
   .flash-txt-up{animation:flashTxtGreen 3s ease-out forwards;}
   .flash-txt-down{animation:flashTxtRed 3s ease-out forwards;}
 `;
+
+function InfoSection({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 48, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: C.textFaint, marginBottom: 16 }}>How Scoring Works</div>
+      <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.7 }}>{children}</div>
+    </div>
+  );
+}
+
+function InfoRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <span style={{ color: C.textFaint, flexShrink: 0, marginTop: 2 }}>·</span>
+      <span>{children}</span>
+    </div>
+  );
+}
 
 function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   teams: ScoredTeam[]; sortKey: string; sortAsc: boolean;
@@ -440,6 +458,13 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
           </tbody>
         </table>
       </div>
+      <InfoSection>
+        <InfoRow>Highest scorer each week wins $25.</InfoRow>
+        <InfoRow>Weekly prizes are for regular season only and do not apply to fantasy playoffs.</InfoRow>
+        <InfoRow>Season Total Leader — highest cumulative roto score across all regular season weeks. One $25 prize awarded at end of season.</InfoRow>
+        <InfoRow>Score to Beat — highest single-week roto score by any team all season. One $25 prize awarded at end of season.</InfoRow>
+        <InfoRow>Current week is live and updates every 5 minutes. Completed weeks are locked snapshots.</InfoRow>
+      </InfoSection>
     </div>
   );
 }
@@ -541,6 +566,12 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
         <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
+      <InfoSection>
+        <InfoRow>Yahoo StatTracker is the source of truth for live scoring — it's a great place to see live matchup results.</InfoRow>
+        <InfoRow>Commissioner will routinely update to keep scoring in sync with Yahoo, particularly for previous weeks.</InfoRow>
+        <InfoRow>Ratio ties (ERA, WHIP, OPS) will show as ties until the commissioner updates to match Yahoo.</InfoRow>
+        <InfoRow>Side pot rankings are based on H2H finish within that pot's members only.</InfoRow>
+      </InfoSection>
     </div>
   );
 }
@@ -757,6 +788,16 @@ export default function App() {
 
   if (loading) return (<><style>{globalStyle}</style><div style={{ padding: 32, fontFamily: "system-ui,sans-serif", color: C.textMuted }}>Loading...</div></>);
 
+  const weeklyInfoSection = (
+    <InfoSection>
+      <InfoRow>Roto scoring: all 12 teams ranked 1–12 in each of the 12 categories.</InfoRow>
+      <InfoRow>R, HR, RBI, SB, W, K, QS, SVH (counting stats) split ties evenly.</InfoRow>
+      <InfoRow>AVG uses precise H/AB ratio so ties at the display level are broken correctly.</InfoRow>
+      <InfoRow>ERA, WHIP, and OPS use Yahoo's rounded values — weekly prize scores do not split ties for these categories.</InfoRow>
+      <InfoRow>Weekly scores will be finalized after any Yahoo stat corrections have been made. Weekly scores will show as "Pending" until then.</InfoRow>
+    </InfoSection>
+  );
+
   return (
     <>
       <style>{globalStyle}</style>
@@ -804,6 +845,7 @@ export default function App() {
             ) : displayTeams ? (
               <BreakdownTable teams={displayTeams} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
             ) : null}
+            {weeklyInfoSection}
           </div>
         )}
 
