@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 
 const DEFAULT_DATA = [
-  { name: "RL\u2019s Some Stars", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
-  { name: "Big League Chew-pacabras", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1, hab: "" },
-  { name: "Cleveland Streamers", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2, hab: "" },
-  { name: "Clever Name Here", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4, hab: "" },
-  { name: "Jim Leyland\u2019s Lungs", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
-  { name: "Albert\u2019s Pujol", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
-  { name: "Acu\u00f1a Matata", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
-  { name: "Buudy Mac's Dry Run", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
-  { name: "Raleigh The Troops", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
-  { name: "Uptown Finest", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2, hab: "" },
-  { name: "Squeaky Green Beans", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0, hab: "" },
-  { name: "Maximum IL", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1, hab: "" },
+  { name: "RL\u2019s Some Stars", teamId: "10", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
+  { name: "Big League Chew-pacabras", teamId: "4", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1, hab: "" },
+  { name: "Cleveland Streamers", teamId: "5", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2, hab: "" },
+  { name: "Clever Name Here", teamId: "11", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4, hab: "" },
+  { name: "Jim Leyland\u2019s Lungs", teamId: "8", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
+  { name: "Albert\u2019s Pujol", teamId: "2", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
+  { name: "Acu\u00f1a Matata", teamId: "12", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
+  { name: "Buudy Mac's Dry Run", teamId: "9", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
+  { name: "Raleigh The Troops", teamId: "6", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
+  { name: "Uptown Finest", teamId: "3", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2, hab: "" },
+  { name: "Squeaky Green Beans", teamId: "1", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0, hab: "" },
+  { name: "Maximum IL", teamId: "7", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1, hab: "" },
 ];
 
 const CATS = [
@@ -33,6 +33,10 @@ const CATS = [
 const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
+
+// Sidepot membership by permanent Yahoo team ID — immune to name changes
+const SIDEPOT1_IDS = new Set(["4", "5", "9", "2", "1", "6", "7", "11"]);
+const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 
 const WEEK_SCHEDULE = [
   { week: 1,  start: "Mar 25", end: "Mar 29" },
@@ -70,32 +74,22 @@ const WEEK_STARTS = [
   "2026-08-17","2026-08-24","2026-08-31","2026-09-07","2026-09-14",
 ];
 
-type H2HTeam = { name: string; w: number; l: number; t: number; winPct: number; gb: number };
+type H2HTeam = { name: string; teamId: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number };
 
 const FALLBACK_H2H: H2HTeam[] = [
-  { name: "Clever Name Here",          w: 24, l: 11, t: 1, winPct: 0.681, gb: 0 },
-  { name: "RL\u2019s Some Stars",      w: 22, l: 12, t: 2, winPct: 0.639, gb: 2 },
-  { name: "Uptown Finest",             w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5 },
-  { name: "Buudy Mac's Dry Run",       w: 18, l: 15, t: 3, winPct: 0.542, gb: 6 },
-  { name: "Albert\u2019s Pujol",       w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5 },
-  { name: "Jim Leyland\u2019s Lungs",  w: 17, l: 16, t: 3, winPct: 0.514, gb: 7 },
-  { name: "Cleveland Streamers",       w: 16, l: 16, t: 4, winPct: 0.500, gb: 8 },
-  { name: "Squeaky Green Beans",       w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5 },
-  { name: "Big League Chew-pacabras",  w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5 },
-  { name: "Raleigh The Troops",        w: 15, l: 19, t: 2, winPct: 0.444, gb: 10 },
-  { name: "Acu\u00f1a Matata",         w: 13, l: 19, t: 4, winPct: 0.417, gb: 11 },
-  { name: "Maximum IL",                w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17 },
+  { name: "Clever Name Here",            teamId: "11", w: 24, l: 11, t: 1, winPct: 0.681, gb: 0,   rank: 1 },
+  { name: "RL\u2019s Some Stars",         teamId: "10", w: 22, l: 12, t: 2, winPct: 0.639, gb: 2,   rank: 2 },
+  { name: "Uptown Finest",               teamId: "3",  w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5, rank: 3 },
+  { name: "Buudy Mac's Dry Run",         teamId: "9",  w: 18, l: 15, t: 3, winPct: 0.542, gb: 6,   rank: 4 },
+  { name: "Albert\u2019s Pujol",          teamId: "2",  w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5, rank: 5 },
+  { name: "Jim Leyland\u2019s Lungs",     teamId: "8",  w: 17, l: 16, t: 3, winPct: 0.514, gb: 7,   rank: 6 },
+  { name: "Cleveland Streamers",         teamId: "5",  w: 16, l: 16, t: 4, winPct: 0.500, gb: 8,   rank: 7 },
+  { name: "Squeaky Green Beans",         teamId: "1",  w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5, rank: 8 },
+  { name: "Big League Chew-pacabras",    teamId: "4",  w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5, rank: 9 },
+  { name: "Raleigh The Troops",          teamId: "6",  w: 15, l: 19, t: 2, winPct: 0.444, gb: 10,  rank: 10 },
+  { name: "Acu\u00f1a Matata",            teamId: "12", w: 13, l: 19, t: 4, winPct: 0.417, gb: 11,  rank: 11 },
+  { name: "Maximum IL",                  teamId: "7",  w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17,  rank: 12 },
 ];
-
-const SIDEPOT1_TEAMS = new Set([
-  "Big League Chew-pacabras", "Cleveland Streamers", "Buudy Mac's Dry Run",
-  "Albert\u2019s Pujol", "Squeaky Green Beans", "Raleigh The Troops",
-  "Maximum IL", "Clever Name Here",
-]);
-
-const SIDEPOT2_TEAMS = new Set([
-  "Squeaky Green Beans", "Raleigh The Troops", "Maximum IL", "Clever Name Here",
-]);
 
 const PLAYOFF_PRIZES: Record<number, number> = { 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 };
 const SIDEPOT1_PAYOUTS: Record<number, number> = { 1: 330, 2: 170, 3: 100 };
@@ -158,7 +152,7 @@ function getCompletedWeeks() {
 }
 
 type Team = {
-  name: string; r: number; hr: number; rbi: number; sb: number;
+  name: string; teamId: string; r: number; hr: number; rbi: number; sb: number;
   avg: number; ops: number; w: number; k: number; era: number;
   whip: number; qs: number; svh: number; hab: string;
 };
@@ -470,7 +464,7 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
 }
 
 function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, showPlayoff }: {
-  rows: { name: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number }[];
+  rows: H2HTeam[];
   prizes: Record<number, number>; accentColor: string; accentBg: string; accentBorder: string; showPlayoff: boolean;
 }) {
   return (
@@ -492,7 +486,7 @@ function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, sho
           const inPlayoffs = showPlayoff && team.rank <= 6;
           const hasBye = showPlayoff && team.rank <= 2;
           return (
-            <tr key={team.name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+            <tr key={team.teamId} style={{ borderBottom: `1px solid ${C.borderLight}` }}
               onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <td style={{ padding: "12px 10px", color: C.textFaint, fontSize: 12 }}>{team.rank}</td>
@@ -542,8 +536,8 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
 
 function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: string | null }) {
   const allRows = h2h.map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp1Rows = h2h.filter(t => SIDEPOT1_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp2Rows = h2h.filter(t => SIDEPOT2_TEAMS.has(t.name)).map((t, i) => ({ ...t, rank: i + 1 }));
+  const sp1Rows = h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 }));
+  const sp2Rows = h2h.filter(t => SIDEPOT2_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 }));
   return (
     <div>
       {h2hUpdatedAt && (
@@ -556,12 +550,12 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
         <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
-      <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_TEAMS.size} participants · Ranked by H2H finish among SP1 members only`}
+      <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_IDS.size} participants · Ranked by H2H finish among SP1 members only`}
         emoji="💛" borderColor="#fde047" accentColor="#854d0e"
         payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}>
         <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
-      <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_TEAMS.size} participants · Ranked by H2H finish among SP2 members only`}
+      <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_IDS.size} participants · Ranked by H2H finish among SP2 members only`}
         emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
         <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
@@ -672,7 +666,11 @@ export default function App() {
       if (tsVal) setLastUpdated(tsVal);
       if (h2hVal) {
         const parsed = JSON.parse(h2hVal);
-        if (parsed.standings?.length) { setH2h(parsed.standings); setH2hUpdatedAt(parsed.updatedAt ?? null); }
+        if (parsed.standings?.length) {
+          const standings = parsed.standings.map((t: any, i: number) => ({ ...t, rank: i + 1, teamId: t.teamId ?? "" }));
+          setH2h(standings);
+          setH2hUpdatedAt(parsed.updatedAt ?? null);
+        }
       }
     };
     load(true);
@@ -717,7 +715,7 @@ export default function App() {
         if (!isNaN(parseFloat(val)) || val.startsWith(".")) { nums.push(parseFloat(val)); i++; } else break;
       }
       if (nums.length === 14 && name && !/^\d+$/.test(name))
-        teams.push({ name, r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13], hab: "" });
+        teams.push({ name, teamId: "", r: nums[1], hr: nums[2], rbi: nums[3], sb: nums[4], avg: nums[5], ops: nums[6], w: nums[8], k: nums[9], era: nums[10], whip: nums[11], qs: nums[12], svh: nums[13], hab: "" });
     }
     return teams;
   };
@@ -745,7 +743,14 @@ export default function App() {
         const [teamsVal, tsVal, h2hVal] = await Promise.all([kvGet(TEAMS_KEY), kvGet(TIMESTAMP_KEY), kvGet(H2H_KEY)]);
         if (teamsVal) setLiveTeams(JSON.parse(teamsVal));
         if (tsVal) setLastUpdated(tsVal);
-        if (h2hVal) { const p = JSON.parse(h2hVal); if (p.standings?.length) { setH2h(p.standings); setH2hUpdatedAt(p.updatedAt ?? null); } }
+        if (h2hVal) {
+          const p = JSON.parse(h2hVal);
+          if (p.standings?.length) {
+            const standings = p.standings.map((t: any, i: number) => ({ ...t, rank: i + 1, teamId: t.teamId ?? "" }));
+            setH2h(standings);
+            setH2hUpdatedAt(p.updatedAt ?? null);
+          }
+        }
         setSyncResult(`✓ Synced ${data.teams} teams at ${toEastern(data.updatedAt)}`);
       } else { setSyncResult(`✗ Sync failed: ${data.error}`); }
     } catch (e: any) { setSyncResult(`✗ Error: ${e.message}`); }
