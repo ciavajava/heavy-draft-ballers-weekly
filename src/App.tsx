@@ -473,12 +473,12 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
         <StandingsTable rows={allRows} prizes={{ 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 }} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
       <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_IDS.size} participants · Ranked by H2H finish among SP1 members only`}
-        emoji="💛" borderColor="#fde047" accentColor="#854d0e"
+        emoji="💰" borderColor="#fde047" accentColor="#854d0e"
         payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}>
         <StandingsTable rows={sp1Rows} prizes={{ 1: 330, 2: 170, 3: 100 }} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
       <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_IDS.size} participants · Ranked by H2H finish among SP2 members only`}
-        emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8"
+        emoji="💵" borderColor="#93c5fd" accentColor="#1d4ed8"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
         <StandingsTable rows={sp2Rows} prizes={{ 1: 250, 2: 150 }} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
