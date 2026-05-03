@@ -1,20 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-const DEFAULT_DATA = [
-  { name: "RL\u2019s Some Stars", teamId: "10", r: 14, hr: 6, rbi: 20, sb: 3, avg: .248, ops: .708, w: 3, k: 36, era: 0.57, whip: 0.76, qs: 4, svh: 3, hab: "" },
-  { name: "Big League Chew-pacabras", teamId: "4", r: 15, hr: 8, rbi: 18, sb: 2, avg: .302, ops: .978, w: 2, k: 22, era: 2.12, whip: 0.88, qs: 1, svh: 1, hab: "" },
-  { name: "Cleveland Streamers", teamId: "5", r: 10, hr: 2, rbi: 12, sb: 2, avg: .280, ops: .743, w: 2, k: 30, era: 2.28, whip: 1.01, qs: 2, svh: 2, hab: "" },
-  { name: "Clever Name Here", teamId: "11", r: 16, hr: 3, rbi: 9, sb: 1, avg: .289, ops: .924, w: 2, k: 17, era: 2.55, whip: 0.74, qs: 1, svh: 4, hab: "" },
-  { name: "Jim Leyland\u2019s Lungs", teamId: "8", r: 12, hr: 1, rbi: 12, sb: 2, avg: .288, ops: .749, w: 0, k: 41, era: 5.60, whip: 1.68, qs: 0, svh: 2, hab: "" },
-  { name: "Albert\u2019s Pujol", teamId: "2", r: 8, hr: 5, rbi: 15, sb: 1, avg: .279, ops: .836, w: 1, k: 42, era: 5.35, whip: 1.32, qs: 1, svh: 1, hab: "" },
-  { name: "Acu\u00f1a Matata", teamId: "12", r: 19, hr: 6, rbi: 14, sb: 3, avg: .301, ops: .962, w: 0, k: 28, era: 6.17, whip: 1.37, qs: 1, svh: 0, hab: "" },
-  { name: "Buudy Mac's Dry Run", teamId: "9", r: 7, hr: 1, rbi: 4, sb: 2, avg: .212, ops: .574, w: 1, k: 40, era: 3.62, whip: 1.32, qs: 0, svh: 2, hab: "" },
-  { name: "Raleigh The Troops", teamId: "6", r: 7, hr: 1, rbi: 6, sb: 2, avg: .180, ops: .495, w: 1, k: 26, era: 0.00, whip: 0.96, qs: 1, svh: 1, hab: "" },
-  { name: "Uptown Finest", teamId: "3", r: 11, hr: 0, rbi: 3, sb: 2, avg: .141, ops: .386, w: 1, k: 19, era: 4.15, whip: 1.02, qs: 2, svh: 2, hab: "" },
-  { name: "Squeaky Green Beans", teamId: "1", r: 13, hr: 5, rbi: 9, sb: 3, avg: .221, ops: .727, w: 1, k: 21, era: 2.81, whip: 1.36, qs: 2, svh: 0, hab: "" },
-  { name: "Maximum IL", teamId: "7", r: 14, hr: 5, rbi: 7, sb: 2, avg: .209, ops: .831, w: 2, k: 32, era: 5.22, whip: 1.47, qs: 1, svh: 1, hab: "" },
-];
-
 const CATS = [
   { key: "r",    label: "R",    dir: 1,  fmt: (v: number) => v },
   { key: "hr",   label: "HR",   dir: 1,  fmt: (v: number) => v },
@@ -34,7 +19,7 @@ const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
 
-// Sidepot membership by permanent Yahoo team ID — immune to name changes
+// Permanent Yahoo team IDs — never change even when names do
 const SIDEPOT1_IDS = new Set(["4", "5", "9", "2", "1", "6", "7", "11"]);
 const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 
@@ -75,81 +60,6 @@ const WEEK_STARTS = [
 ];
 
 type H2HTeam = { name: string; teamId: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number };
-
-const FALLBACK_H2H: H2HTeam[] = [
-  { name: "Clever Name Here",            teamId: "11", w: 24, l: 11, t: 1, winPct: 0.681, gb: 0,   rank: 1 },
-  { name: "RL\u2019s Some Stars",         teamId: "10", w: 22, l: 12, t: 2, winPct: 0.639, gb: 2,   rank: 2 },
-  { name: "Uptown Finest",               teamId: "3",  w: 19, l: 13, t: 4, winPct: 0.583, gb: 4.5, rank: 3 },
-  { name: "Buudy Mac's Dry Run",         teamId: "9",  w: 18, l: 15, t: 3, winPct: 0.542, gb: 6,   rank: 4 },
-  { name: "Albert\u2019s Pujol",          teamId: "2",  w: 16, l: 15, t: 5, winPct: 0.514, gb: 7.5, rank: 5 },
-  { name: "Jim Leyland\u2019s Lungs",     teamId: "8",  w: 17, l: 16, t: 3, winPct: 0.514, gb: 7,   rank: 6 },
-  { name: "Cleveland Streamers",         teamId: "5",  w: 16, l: 16, t: 4, winPct: 0.500, gb: 8,   rank: 7 },
-  { name: "Squeaky Green Beans",         teamId: "1",  w: 16, l: 17, t: 3, winPct: 0.486, gb: 8.5, rank: 8 },
-  { name: "Big League Chew-pacabras",    teamId: "4",  w: 15, l: 18, t: 3, winPct: 0.458, gb: 9.5, rank: 9 },
-  { name: "Raleigh The Troops",          teamId: "6",  w: 15, l: 19, t: 2, winPct: 0.444, gb: 10,  rank: 10 },
-  { name: "Acu\u00f1a Matata",            teamId: "12", w: 13, l: 19, t: 4, winPct: 0.417, gb: 11,  rank: 11 },
-  { name: "Maximum IL",                  teamId: "7",  w: 7,  l: 27, t: 2, winPct: 0.222, gb: 17,  rank: 12 },
-];
-
-const PLAYOFF_PRIZES: Record<number, number> = { 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 };
-const SIDEPOT1_PAYOUTS: Record<number, number> = { 1: 330, 2: 170, 3: 100 };
-const SIDEPOT2_PAYOUTS: Record<number, number> = { 1: 250, 2: 150 };
-
-const SEEDED_SNAPSHOTS_BY_RANK: Record<number, { pts: number }[]> = {
-  1: [
-    { pts: 109.5 }, { pts: 106.5 }, { pts: 102.5 }, { pts: 84 }, { pts: 82.5 },
-    { pts: 77.5 }, { pts: 71.5 }, { pts: 65 }, { pts: 64 }, { pts: 58 },
-    { pts: 57.5 }, { pts: 57.5 },
-  ],
-  2: [
-    { pts: 120 },  { pts: 100.5 }, { pts: 92 },   { pts: 84.5 }, { pts: 79.5 },
-    { pts: 77.5 }, { pts: 72 },    { pts: 71 },   { pts: 65 },   { pts: 61.5 },
-    { pts: 57.5 }, { pts: 55 },
-  ],
-};
-
-const SEEDED_SNAPSHOT_NAMES: Record<number, string[]> = {
-  1: [
-    "RL\u2019s Some Stars", "Big League Chew-pacabras", "Clever Name Here",
-    "Squeaky Green Beans", "Acu\u00f1a Matata", "Cleveland Streamers",
-    "Albert\u2019s Pujol", "Buudy Mac's Dry Run", "Uptown Finest",
-    "Maximum IL", "Raleigh The Troops", "Jim Leyland\u2019s Lungs",
-  ],
-  2: [
-    "Squeaky Green Beans", "Clever Name Here", "Raleigh The Troops",
-    "RL\u2019s Some Stars", "Maximum IL", "Jim Leyland\u2019s Lungs",
-    "Uptown Finest", "Albert\u2019s Pujol", "Buudy Mac's Dry Run",
-    "Acu\u00f1a Matata", "Big League Chew-pacabras", "Cleveland Streamers",
-  ],
-};
-
-function buildSeededSnapshots(liveNames: string[]): Record<number, Record<string, number>> {
-  const result: Record<number, Record<string, number>> = {};
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-  const normalizedLive = liveNames.map(n => ({ real: n, norm: normalize(n) }));
-  for (const [weekStr, names] of Object.entries(SEEDED_SNAPSHOT_NAMES)) {
-    const week = parseInt(weekStr);
-    const pts = SEEDED_SNAPSHOTS_BY_RANK[week];
-    result[week] = {};
-    names.forEach((seedName, i) => {
-      const normSeed = normalize(seedName);
-      const match = normalizedLive.find(l => l.norm === normSeed);
-      if (match) result[week][match.real] = pts[i].pts;
-    });
-  }
-  return result;
-}
-
-function getCurrentWeekNum() {
-  const now = new Date();
-  const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
-  return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
-}
-
-function getCompletedWeeks() {
-  const current = getCurrentWeekNum();
-  return WEEK_SCHEDULE.filter(w => w.week < current);
-}
 
 type Team = {
   name: string; teamId: string; r: number; hr: number; rbi: number; sb: number;
@@ -318,7 +228,7 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
         </thead>
         <tbody>
           {displayRows.map((t, i) => (
-            <tr key={t.name} style={{ borderBottom: `1px solid ${C.border}` }}
+            <tr key={t.teamId} style={{ borderBottom: `1px solid ${C.border}` }}
               onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <td style={{ padding: "10px 6px", fontSize: 12, color: C.textFaint, verticalAlign: "middle" }}>{i + 1}</td>
@@ -346,55 +256,77 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
   );
 }
 
-function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
-  liveScored: ScoredTeam[]; snapshots: Record<number, Record<string, number>>; currentWeekNum: number;
+function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
+  liveScored: ScoredTeam[];
+  snapshots: Record<number, Record<string, number>>;
+  idToName: Record<string, string>;
+  currentWeekNum: number;
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
+
+  // Live scores keyed by teamId
   const liveScores: Record<string, number> = {};
-  liveScored.forEach(t => { liveScores[t.name] = t.total; });
-  const allTeamNames = liveScored.map(t => t.name);
+  liveScored.forEach(t => { liveScores[t.teamId] = t.total; });
+
+  // All team IDs from live teams
+  const allTeamIds = liveScored.map(t => t.teamId);
+
+  // Season totals keyed by teamId
   const seasonTotals: Record<string, number> = {};
-  allTeamNames.forEach(name => {
+  allTeamIds.forEach(id => {
     let total = 0;
-    completedWeekNums.forEach(w => { const snap = snapshots[w]; if (snap && snap[name] != null) total += snap[name]; });
-    if (liveScores[name] != null) total += liveScores[name];
-    seasonTotals[name] = total;
+    completedWeekNums.forEach(w => {
+      const snap = snapshots[w];
+      if (snap && snap[id] != null) total += snap[id];
+    });
+    if (liveScores[id] != null) total += liveScores[id];
+    seasonTotals[id] = total;
   });
-  const sortedTeams = [...allTeamNames].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
+
+  const sortedIds = [...allTeamIds].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
+
   const weekHighScores: Record<number, number> = {};
-  completedWeekNums.forEach(w => { const snap = snapshots[w]; if (!snap) return; weekHighScores[w] = Math.max(...Object.values(snap)); });
-  const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
-  let kingScore = 0, kingTeam = "", kingWeek = 0;
   completedWeekNums.forEach(w => {
     const snap = snapshots[w]; if (!snap) return;
-    Object.entries(snap).forEach(([name, pts]) => { if (pts > kingScore) { kingScore = pts; kingTeam = name; kingWeek = w; } });
+    weekHighScores[w] = Math.max(...Object.values(snap));
   });
-  const seasonLeader = sortedTeams[0];
-  const seasonLeaderTotal = seasonTotals[seasonLeader] ?? 0;
+  const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
+
+  let kingScore = 0, kingId = "", kingWeek = 0;
+  completedWeekNums.forEach(w => {
+    const snap = snapshots[w]; if (!snap) return;
+    Object.entries(snap).forEach(([id, pts]) => {
+      if (pts > kingScore) { kingScore = pts; kingId = id; kingWeek = w; }
+    });
+  });
+
+  const seasonLeaderId = sortedIds[0];
+  const seasonLeaderTotal = seasonTotals[seasonLeaderId] ?? 0;
   const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
+
   return (
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        {kingTeam && (
+        {kingId && (
           <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "var(--bg-alt,#f9f9f9)", border: "1px solid #f59e0b" }}>
             <span style={{ fontSize: 20 }}>👑</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#b45309" }}>One-Week Score to Beat</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                {kingTeam} — <span style={{ color: "#b45309" }}>{fmtPts(kingScore)} pts</span>
+                {idToName[kingId] ?? kingId} — <span style={{ color: "#b45309" }}>{fmtPts(kingScore)} pts</span>
                 <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted, marginLeft: 8 }}>Week {kingWeek}</span>
               </div>
             </div>
           </div>
         )}
-        {seasonLeader && (
+        {seasonLeaderId && (
           <div style={{ flex: 1, minWidth: 240, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderRadius: 8, background: "var(--bg-alt,#f9f9f9)", border: "1px solid #86efac" }}>
             <span style={{ fontSize: 20 }}>🏆</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#15803d" }}>Season Total Leader</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                {seasonLeader} — <span style={{ color: "#15803d" }}>{fmtPts(seasonLeaderTotal)} pts</span>
+                {idToName[seasonLeaderId] ?? seasonLeaderId} — <span style={{ color: "#15803d" }}>{fmtPts(seasonLeaderTotal)} pts</span>
               </div>
             </div>
           </div>
@@ -421,20 +353,20 @@ function SeasonGrid({ liveScored, snapshots, currentWeekNum }: {
             </tr>
           </thead>
           <tbody>
-            {sortedTeams.map((name, idx) => (
-              <tr key={name} style={{ borderBottom: `1px solid ${C.borderLight}` }}
+            {sortedIds.map((id, idx) => (
+              <tr key={id} style={{ borderBottom: `1px solid ${C.borderLight}` }}
                 onMouseEnter={e => (e.currentTarget.style.background = C.bgAlt)}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <td style={{ padding: "9px 10px", whiteSpace: "nowrap", position: "sticky", left: 0, background: C.bg, zIndex: 1, color: C.text, textAlign: "left" }}>
                   <span style={{ fontSize: 11, color: C.textFaint, marginRight: 6 }}>{idx + 1}</span>
-                  <span>{name}</span>
+                  <span>{idToName[id] ?? id}</span>
                 </td>
-                <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>{fmtPts(seasonTotals[name] ?? 0)}</td>
+                <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>{fmtPts(seasonTotals[id] ?? 0)}</td>
                 {visibleWeeks.map(w => {
                   const isCurrentWeek = w === currentWeekNum;
                   const isFuture = w > currentWeekNum;
                   const snap = snapshots[w];
-                  const score = isCurrentWeek ? liveScores[name] : snap?.[name];
+                  const score = isCurrentWeek ? liveScores[id] : snap?.[id];
                   const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
                   const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
                   let cellBg = "transparent", cellColor = C.text;
@@ -548,17 +480,17 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
       <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
         emoji="🏆" borderColor="#86efac" accentColor="#15803d"
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
-        <StandingsTable rows={allRows} prizes={PLAYOFF_PRIZES} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
+        <StandingsTable rows={allRows} prizes={{ 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 }} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
       <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_IDS.size} participants · Ranked by H2H finish among SP1 members only`}
         emoji="💛" borderColor="#fde047" accentColor="#854d0e"
         payoutDesc={<span>1st <strong>$330</strong> · 2nd <strong>$170</strong> · 3rd <strong>$100</strong></span>}>
-        <StandingsTable rows={sp1Rows} prizes={SIDEPOT1_PAYOUTS} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
+        <StandingsTable rows={sp1Rows} prizes={{ 1: 330, 2: 170, 3: 100 }} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
       <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_IDS.size} participants · Ranked by H2H finish among SP2 members only`}
         emoji="💙" borderColor="#93c5fd" accentColor="#1d4ed8"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
-        <StandingsTable rows={sp2Rows} prizes={SIDEPOT2_PAYOUTS} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
+        <StandingsTable rows={sp2Rows} prizes={{ 1: 250, 2: 150 }} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
       <InfoSection>
         <InfoRow>Yahoo StatTracker is the source of truth for live scoring — it's a great place to see live matchup results.</InfoRow>
@@ -574,11 +506,12 @@ export default function App() {
   const [view, setView] = useState<"weekly" | "grid" | "standings">("weekly");
   const [sortKey, setSortKey] = useState("total");
   const [sortAsc, setSortAsc] = useState(false);
-  const [liveTeams, setLiveTeams] = useState<Team[]>(DEFAULT_DATA);
+  const [liveTeams, setLiveTeams] = useState<Team[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [weekWinners, setWeekWinners] = useState<Record<number, WeekWinner>>({});
   const [snapshots, setSnapshots] = useState<Record<number, Record<string, number>>>({});
-  const [h2h, setH2h] = useState<H2HTeam[]>(FALLBACK_H2H);
+  const [idToName, setIdToName] = useState<Record<string, string>>({});
+  const [h2h, setH2h] = useState<H2HTeam[]>([]);
   const [h2hUpdatedAt, setH2hUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [flashMap, setFlashMap] = useState<Record<string, string>>({});
@@ -603,6 +536,17 @@ export default function App() {
   const currentWeekNum = getCurrentWeekNum();
   const currentWeekSched = WEEK_SCHEDULE[currentWeekNum - 1];
   const completedWeeks = getCompletedWeeks();
+
+  function getCurrentWeekNum() {
+    const now = new Date();
+    const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
+    return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
+  }
+
+  function getCompletedWeeks() {
+    const current = getCurrentWeekNum();
+    return WEEK_SCHEDULE.filter(w => w.week < current);
+  }
 
   const triggerFlash = (newTeams: Team[]) => {
     const oldTeams = prevTeamsRef.current;
@@ -645,16 +589,40 @@ export default function App() {
         newTeams.forEach(t => { newMap[t.name] = t; });
         prevTeamsRef.current = newMap;
         prevScoredRef.current = computeRoto(newTeams);
+
+        // Build id->name map
+        const newIdToName: Record<string, string> = {};
+        newTeams.forEach(t => { newIdToName[t.teamId] = t.name; });
+        setIdToName(newIdToName);
         setLiveTeams(newTeams);
+
         if (initial) {
-          const realNames = newTeams.map(t => t.name);
-          const seeded = buildSeededSnapshots(realNames);
           const ww: Record<number, WeekWinner> = {};
-          const snaps: Record<number, Record<string, number>> = { ...seeded };
+          const snaps: Record<number, Record<string, number>> = {};
           await Promise.all(Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(async w => {
             const [val, snapVal] = await Promise.all([kvGet(WEEK_PREFIX + w), kvGet(`${SNAPSHOT_PREFIX}${w}_snapshot`)]);
             if (val) ww[w] = JSON.parse(val);
-            if (snapVal) { const parsed = JSON.parse(snapVal); snaps[w] = parsed.scores ?? parsed; }
+            if (snapVal) {
+              const parsed = JSON.parse(snapVal);
+              // Support both ID-keyed and name-keyed snapshots during transition
+              const scores = parsed.scores ?? parsed;
+              // Check if keys are numeric IDs or names
+              const keys = Object.keys(scores);
+              const isIdKeyed = keys.length > 0 && !isNaN(Number(keys[0]));
+              if (isIdKeyed) {
+                snaps[w] = scores;
+              } else {
+                // Legacy name-keyed — convert to ID-keyed using current name->id map
+                const nameToId: Record<string, string> = {};
+                newTeams.forEach(t => { nameToId[t.name] = t.teamId; });
+                const converted: Record<string, number> = {};
+                Object.entries(scores).forEach(([name, pts]) => {
+                  const id = nameToId[name];
+                  if (id) converted[id] = pts as number;
+                });
+                snaps[w] = converted;
+              }
+            }
           }));
           setWeekWinners(ww);
           setSnapshots(snaps);
@@ -854,7 +822,7 @@ export default function App() {
           </div>
         )}
 
-        {view === "grid" && <SeasonGrid liveScored={scored} snapshots={snapshots} currentWeekNum={currentWeekNum} />}
+        {view === "grid" && <SeasonGrid liveScored={scored} snapshots={snapshots} idToName={idToName} currentWeekNum={currentWeekNum} />}
         {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} />}
 
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
