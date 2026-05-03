@@ -19,7 +19,6 @@ const TOTAL_WEEKS = 25;
 const COMM_PASSWORD = "maxmuncy";
 const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
 
-// Permanent Yahoo team IDs — never change even when names do
 const SIDEPOT1_IDS = new Set(["4", "5", "9", "2", "1", "6", "7", "11"]);
 const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 
@@ -60,7 +59,6 @@ const WEEK_STARTS = [
 ];
 
 type H2HTeam = { name: string; teamId: string; w: number; l: number; t: number; winPct: number; gb: number; rank: number };
-
 type Team = {
   name: string; teamId: string; r: number; hr: number; rbi: number; sb: number;
   avg: number; ops: number; w: number; k: number; era: number;
@@ -264,47 +262,28 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
 }) {
   const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
   const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
-
-  // Live scores keyed by teamId
   const liveScores: Record<string, number> = {};
   liveScored.forEach(t => { liveScores[t.teamId] = t.total; });
-
-  // All team IDs from live teams
   const allTeamIds = liveScored.map(t => t.teamId);
-
-  // Season totals keyed by teamId
   const seasonTotals: Record<string, number> = {};
   allTeamIds.forEach(id => {
     let total = 0;
-    completedWeekNums.forEach(w => {
-      const snap = snapshots[w];
-      if (snap && snap[id] != null) total += snap[id];
-    });
+    completedWeekNums.forEach(w => { const snap = snapshots[w]; if (snap && snap[id] != null) total += snap[id]; });
     if (liveScores[id] != null) total += liveScores[id];
     seasonTotals[id] = total;
   });
-
   const sortedIds = [...allTeamIds].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
-
   const weekHighScores: Record<number, number> = {};
-  completedWeekNums.forEach(w => {
-    const snap = snapshots[w]; if (!snap) return;
-    weekHighScores[w] = Math.max(...Object.values(snap));
-  });
+  completedWeekNums.forEach(w => { const snap = snapshots[w]; if (!snap) return; weekHighScores[w] = Math.max(...Object.values(snap)); });
   const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
-
   let kingScore = 0, kingId = "", kingWeek = 0;
   completedWeekNums.forEach(w => {
     const snap = snapshots[w]; if (!snap) return;
-    Object.entries(snap).forEach(([id, pts]) => {
-      if (pts > kingScore) { kingScore = pts; kingId = id; kingWeek = w; }
-    });
+    Object.entries(snap).forEach(([id, pts]) => { if (pts > kingScore) { kingScore = pts; kingId = id; kingWeek = w; } });
   });
-
   const seasonLeaderId = sortedIds[0];
   const seasonLeaderTotal = seasonTotals[seasonLeaderId] ?? 0;
   const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
-
   return (
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -395,6 +374,17 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
   );
 }
 
+// Recalculate GB relative to the leader within a subset of teams
+function recalcGb(rows: H2HTeam[]): H2HTeam[] {
+  if (rows.length === 0) return rows;
+  const leader = rows[0];
+  return rows.map((t, i) => ({
+    ...t,
+    rank: i + 1,
+    gb: i === 0 ? 0 : ((leader.w - t.w) + (t.l - leader.l)) / 2,
+  }));
+}
+
 function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, showPlayoff }: {
   rows: H2HTeam[];
   prizes: Record<number, number>; accentColor: string; accentBg: string; accentBorder: string; showPlayoff: boolean;
@@ -467,9 +457,9 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
 }
 
 function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: string | null }) {
-  const allRows = h2h.map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp1Rows = h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 }));
-  const sp2Rows = h2h.filter(t => SIDEPOT2_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 }));
+  const allRows = recalcGb(h2h.map((t, i) => ({ ...t, rank: i + 1 })));
+  const sp1Rows = recalcGb(h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
+  const sp2Rows = recalcGb(h2h.filter(t => SIDEPOT2_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
   return (
     <div>
       {h2hUpdatedAt && (
@@ -589,13 +579,10 @@ export default function App() {
         newTeams.forEach(t => { newMap[t.name] = t; });
         prevTeamsRef.current = newMap;
         prevScoredRef.current = computeRoto(newTeams);
-
-        // Build id->name map
         const newIdToName: Record<string, string> = {};
         newTeams.forEach(t => { newIdToName[t.teamId] = t.name; });
         setIdToName(newIdToName);
         setLiveTeams(newTeams);
-
         if (initial) {
           const ww: Record<number, WeekWinner> = {};
           const snaps: Record<number, Record<string, number>> = {};
@@ -604,15 +591,12 @@ export default function App() {
             if (val) ww[w] = JSON.parse(val);
             if (snapVal) {
               const parsed = JSON.parse(snapVal);
-              // Support both ID-keyed and name-keyed snapshots during transition
               const scores = parsed.scores ?? parsed;
-              // Check if keys are numeric IDs or names
               const keys = Object.keys(scores);
               const isIdKeyed = keys.length > 0 && !isNaN(Number(keys[0]));
               if (isIdKeyed) {
                 snaps[w] = scores;
               } else {
-                // Legacy name-keyed — convert to ID-keyed using current name->id map
                 const nameToId: Record<string, string> = {};
                 newTeams.forEach(t => { nameToId[t.name] = t.teamId; });
                 const converted: Record<string, number> = {};
