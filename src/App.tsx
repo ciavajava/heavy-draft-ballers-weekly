@@ -700,9 +700,9 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
   );
 }
 
-function StandingsTab({ h2h, h2hUpdatedAt, idToName, currentWeekNum }: {
+function StandingsTab({ h2h, h2hUpdatedAt, idToName }: {
   h2h: H2HTeam[]; h2hUpdatedAt: string | null;
-  idToName: Record<string, string>; currentWeekNum: number;
+  idToName: Record<string, string>;
 }) {
   const allRows = recalcGb(h2h.map((t, i) => ({ ...t, rank: i + 1 })));
   const sp1Rows = recalcGb(h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
