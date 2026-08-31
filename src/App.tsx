@@ -25,11 +25,11 @@ const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 
 const PLAYOFF_SEEDS: Record<number, string> = {
   1: "2",
-  2: "12",
-  3: "11",
+  2: "11",
+  3: "12",
   4: "9",
-  5: "1",
-  6: "8",
+  5: "8",
+  6: "1",
 };
 
 const WEEK_SCHEDULE = [
