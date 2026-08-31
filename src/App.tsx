@@ -23,14 +23,13 @@ const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
 const SIDEPOT1_IDS = new Set(["4", "5", "9", "2", "1", "6", "7", "11"]);
 const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 
-// Playoff seeds from Yahoo standings (permanent for 2026 season)
 const PLAYOFF_SEEDS: Record<number, string> = {
-  1: "2",   // Albert's Pujol
-  3: "12",  // Acuña Matata
-  2: "11",  // Clever Name Here
-  4: "9",   // Buudy Mac's Dry Run
-  6: "1",   // Squeaky Green Beans
-  5: "8",   // Jim Leyland's Lungs
+  1: "2",
+  2: "12",
+  3: "11",
+  4: "9",
+  5: "1",
+  6: "8",
 };
 
 const WEEK_SCHEDULE = [
@@ -402,10 +401,7 @@ function recalcGb(rows: H2HTeam[]): H2HTeam[] {
   }));
 }
 
-// Playoff bracket component
-function PlayoffBracket({ idToName }: {
-  idToName: Record<string, string>;
-}) {
+function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
   const [round1, setRound1] = useState<PlayoffMatchup[]>([]);
   const [round2, setRound2] = useState<PlayoffMatchup[]>([]);
   const [championship, setChampionship] = useState<PlayoffMatchup[]>([]);
@@ -418,24 +414,14 @@ function PlayoffBracket({ idToName }: {
     const fetchPlayoffData = async () => {
       setLoading(true);
       try {
-        // Fetch week 23 matchups (1st round)
-        const r23 = await fetch(`${WORKER_URL}?rawscoreboard=23`);
-        const d23 = await r23.json() as any;
-        const matchups23 = extractPlayoffMatchups(d23);
-
-        // Fetch week 24 matchups (2nd round)
-        const r24 = await fetch(`${WORKER_URL}?rawscoreboard=24`);
-        const d24 = await r24.json() as any;
-        const matchups24 = extractPlayoffMatchups(d24);
-
-        // Fetch week 25 matchups (championship)
-        const r25 = await fetch(`${WORKER_URL}?rawscoreboard=25`);
-        const d25 = await r25.json() as any;
-        const matchups25 = extractPlayoffMatchups(d25);
-
-        setRound1(matchups23);
-        setRound2(matchups24);
-        setChampionship(matchups25);
+        const [r23, r24, r25] = await Promise.all([
+          fetch(`${WORKER_URL}?rawscoreboard=23`).then(r => r.json()),
+          fetch(`${WORKER_URL}?rawscoreboard=24`).then(r => r.json()),
+          fetch(`${WORKER_URL}?rawscoreboard=25`).then(r => r.json()),
+        ]);
+        setRound1(extractPlayoffMatchups(r23));
+        setRound2(extractPlayoffMatchups(r24));
+        setChampionship(extractPlayoffMatchups(r25));
       } catch (e) {
         console.error("Failed to fetch playoff data", e);
       }
@@ -461,12 +447,12 @@ function PlayoffBracket({ idToName }: {
           if (!t) continue;
           const info = t[0];
           const teamIdObj = Array.isArray(info) ? info.find((x: any) => x?.team_id) : null;
-          if (teamIdObj?.team_id) ids.push(teamIdObj.team_id);
-          // Check for winner
+          const teamId = teamIdObj?.team_id;
+          if (teamId) ids.push(teamId);
           const standings = t[2]?.team_standings;
           if (standings?.outcome_totals) {
             const wins = parseInt(standings.outcome_totals.wins ?? "0");
-            if (wins > 0 && !winnerId) winnerId = teamIdObj?.team_id;
+            if (wins > 0 && !winnerId) winnerId = teamId;
           }
         }
         if (ids.length === 2) result.push({ teamA: ids[0], teamB: ids[1], winnerId });
@@ -475,8 +461,7 @@ function PlayoffBracket({ idToName }: {
     } catch { return []; }
   }
 
-  // Determine winners/losers from round 1
-  const r1MatchA = round1.find(m => 
+  const r1MatchA = round1.find(m =>
     (m.teamA === seed(3) || m.teamB === seed(3)) &&
     (m.teamA === seed(6) || m.teamB === seed(6))
   );
@@ -490,41 +475,37 @@ function PlayoffBracket({ idToName }: {
   const winnerB = r1MatchB?.winnerId;
   const loserB = r1MatchB ? (r1MatchB.teamA === winnerB ? r1MatchB.teamB : r1MatchB.teamA) : undefined;
 
-  // Round 2 matchups
-  const r2Championship = round2.find(m =>
-    (m.teamA === seed(1) || m.teamB === seed(1) || m.teamA === seed(2) || m.teamB === seed(2))
+  const r2MatchC = round2.find(m =>
+    (m.teamA === seed(1) || m.teamB === seed(1))
   );
-  const r2Consolation = round2.find(m =>
-    m !== r2Championship && round2.length > 1
+  const r2MatchD = round2.find(m =>
+    (m.teamA === seed(2) || m.teamB === seed(2))
   );
+  const r2MatchE = round2.find(m => m !== r2MatchC && m !== r2MatchD);
 
-  // Championship matchups
-  const finalMatch = championship.find(m => championship.indexOf(m) === 0);
-  const thirdPlace = championship.find(m => championship.indexOf(m) === 1);
+  const winnerC = r2MatchC?.winnerId;
+  const loserC = r2MatchC ? (r2MatchC.teamA === winnerC ? r2MatchC.teamB : r2MatchC.teamA) : undefined;
+  const winnerD = r2MatchD?.winnerId;
+  const loserD = r2MatchD ? (r2MatchD.teamA === winnerD ? r2MatchD.teamB : r2MatchD.teamA) : undefined;
 
-  const MatchCard = ({ teamId, isWinner, isPending, isBye }: {
-    teamId?: string; isWinner?: boolean; isPending?: boolean; isBye?: boolean;
+  const champMatch = championship.find(m =>
+    (winnerC && (m.teamA === winnerC || m.teamB === winnerC)) ||
+    (winnerD && (m.teamA === winnerD || m.teamB === winnerD))
+  ) ?? championship[0];
+  const thirdPlace = championship.find(m => m !== champMatch) ?? championship[1];
+
+  const MatchCard = ({ teamId, isWinner, isBye }: {
+    teamId?: string; isWinner?: boolean; isBye?: boolean;
   }) => (
     <div style={{
-      padding: "8px 12px",
-      borderRadius: 6,
+      padding: "8px 12px", borderRadius: 6,
       border: `1px solid ${isWinner ? "#86efac" : isBye ? "#fde047" : C.border}`,
       background: isWinner ? "rgba(34,197,94,0.1)" : isBye ? "rgba(251,191,36,0.1)" : C.bgAlt,
-      fontSize: 13,
-      fontWeight: isWinner ? 700 : 400,
+      fontSize: 12, fontWeight: isWinner ? 700 : 400,
       color: isWinner ? "#15803d" : isBye ? "#854d0e" : teamId ? C.text : C.textFaint,
-      minWidth: 160,
-      textAlign: "center" as const,
-      whiteSpace: "nowrap" as const,
+      minWidth: 160, textAlign: "center" as const, whiteSpace: "nowrap" as const,
     }}>
-      {isBye ? `✓ Bye — ${teamId ? name(teamId) : ""}` : teamId ? name(teamId) : isPending ? "TBD" : "—"}
-    </div>
-  );
-
-  const RoundLabel = ({ label, dates }: { label: string; dates: string }) => (
-    <div style={{ textAlign: "center", marginBottom: 12 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{label}</div>
-      <div style={{ fontSize: 11, color: C.textFaint }}>{dates}</div>
+      {isBye ? `✓ Bye — ${teamId ? name(teamId) : ""}` : teamId ? name(teamId) : "TBD"}
     </div>
   );
 
@@ -532,11 +513,11 @@ function PlayoffBracket({ idToName }: {
     teamA?: string; teamB?: string; winnerId?: string; label?: string;
   }) => (
     <div style={{ marginBottom: 16 }}>
-      {label && <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>{label}</div>}
+      {label && <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 4, textAlign: "center" }}>{label}</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <MatchCard teamId={teamA} isWinner={!!winnerId && teamA === winnerId} isPending={!teamA} />
+        <MatchCard teamId={teamA} isWinner={!!winnerId && teamA === winnerId} />
         <div style={{ fontSize: 11, color: C.textFaint, textAlign: "center" }}>vs</div>
-        <MatchCard teamId={teamB} isWinner={!!winnerId && teamB === winnerId} isPending={!teamB} />
+        <MatchCard teamId={teamB} isWinner={!!winnerId && teamB === winnerId} />
       </div>
     </div>
   );
@@ -544,7 +525,7 @@ function PlayoffBracket({ idToName }: {
   if (loading) return <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0" }}>Loading bracket...</div>;
 
   return (
-    <div style={{ marginBottom: 36, border: `1px solid #a78bfa`, borderRadius: 10, overflow: "hidden" }}>
+    <div style={{ marginBottom: 36, border: "1px solid #a78bfa", borderRadius: 10, overflow: "hidden" }}>
       <div style={{ background: "var(--bg-alt,#f9f9f9)", borderBottom: "1px solid #a78bfa", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#6d28d9" }}>🏆 Playoffs</div>
@@ -555,21 +536,16 @@ function PlayoffBracket({ idToName }: {
         </div>
       </div>
       <div style={{ padding: 20, overflowX: "auto" }}>
-        <div style={{ display: "flex", gap: 32, alignItems: "flex-start", minWidth: 700 }}>
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-start", minWidth: 700 }}>
 
           {/* 1st Round */}
-          <div style={{ minWidth: 200 }}>
-            <RoundLabel label="1st Round" dates="Aug 31 – Sep 6" />
-            <Matchup
-              teamA={seed(3)} teamB={seed(6)}
-              winnerId={r1MatchA?.winnerId}
-              label="Match A"
-            />
-            <Matchup
-              teamA={seed(4)} teamB={seed(5)}
-              winnerId={r1MatchB?.winnerId}
-              label="Match B"
-            />
+          <div style={{ minWidth: 190 }}>
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>1st Round</div>
+              <div style={{ fontSize: 11, color: C.textFaint }}>Aug 31 – Sep 6</div>
+            </div>
+            <Matchup teamA={seed(3)} teamB={seed(6)} winnerId={r1MatchA?.winnerId} label="Match A" />
+            <Matchup teamA={seed(4)} teamB={seed(5)} winnerId={r1MatchB?.winnerId} label="Match B" />
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>Byes</div>
               <MatchCard teamId={seed(1)} isBye />
@@ -578,51 +554,34 @@ function PlayoffBracket({ idToName }: {
             </div>
           </div>
 
-          {/* Arrow */}
-          <div style={{ display: "flex", alignItems: "center", paddingTop: 60, color: C.textFaint, fontSize: 20 }}>→</div>
+          <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: C.textFaint, fontSize: 18 }}>→</div>
 
           {/* 2nd Round */}
-          <div style={{ minWidth: 200 }}>
-            <RoundLabel label="2nd Round" dates="Sep 7 – Sep 13" />
-            <Matchup
-              teamA={seed(1)} teamB={winnerA}
-              winnerId={r2Championship?.winnerId}
-              label="Match C"
-            />
-            <Matchup
-              teamA={seed(2)} teamB={winnerB}
-              winnerId={r2Consolation?.winnerId}
-              label="Match D"
-            />
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>5th/6th Place</div>
-              <Matchup
-                teamA={loserA} teamB={loserB}
-                winnerId={round2.find(m => m !== r2Championship && m !== r2Consolation)?.winnerId}
-                label="Match E"
-              />
+          <div style={{ minWidth: 190 }}>
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>2nd Round</div>
+              <div style={{ fontSize: 11, color: C.textFaint }}>Sep 7 – Sep 13</div>
+            </div>
+            <Matchup teamA={seed(1)} teamB={winnerA} winnerId={r2MatchC?.winnerId} label="Match C" />
+            <Matchup teamA={seed(2)} teamB={winnerB} winnerId={r2MatchD?.winnerId} label="Match D" />
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 4, textAlign: "center" }}>5th/6th Place</div>
+              <Matchup teamA={loserA} teamB={loserB} winnerId={r2MatchE?.winnerId} label="Match E" />
             </div>
           </div>
 
-          {/* Arrow */}
-          <div style={{ display: "flex", alignItems: "center", paddingTop: 60, color: C.textFaint, fontSize: 20 }}>→</div>
+          <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: C.textFaint, fontSize: 18 }}>→</div>
 
           {/* Championship */}
-          <div style={{ minWidth: 200 }}>
-            <RoundLabel label="Championship" dates="Sep 14 – Sep 20" />
-            <Matchup
-              teamA={r2Championship?.winnerId ? (r2Championship.teamA === r2Championship.winnerId ? r2Championship.teamA : r2Championship.teamB) : undefined}
-              teamB={r2Consolation?.winnerId ? (r2Consolation.teamA === r2Consolation.winnerId ? r2Consolation.teamA : r2Consolation.teamB) : undefined}
-              winnerId={finalMatch?.winnerId}
-              label="🏆 1st/2nd Place"
-            />
-            <Matchup
-              teamA={r2Championship?.winnerId ? (r2Championship.teamA === r2Championship.winnerId ? r2Championship.teamB : r2Championship.teamA) : undefined}
-              teamB={r2Consolation?.winnerId ? (r2Consolation.teamA === r2Consolation.winnerId ? r2Consolation.teamB : r2Consolation.teamA) : undefined}
-              winnerId={thirdPlace?.winnerId}
-              label="🥉 3rd/4th Place"
-            />
+          <div style={{ minWidth: 190 }}>
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Championship</div>
+              <div style={{ fontSize: 11, color: C.textFaint }}>Sep 14 – Sep 20</div>
+            </div>
+            <Matchup teamA={winnerC} teamB={winnerD} winnerId={champMatch?.winnerId} label="🏆 1st/2nd Place" />
+            <Matchup teamA={loserC} teamB={loserD} winnerId={thirdPlace?.winnerId} label="🥉 3rd/4th Place" />
           </div>
+
         </div>
       </div>
     </div>
@@ -701,8 +660,7 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
 }
 
 function StandingsTab({ h2h, h2hUpdatedAt, idToName }: {
-  h2h: H2HTeam[]; h2hUpdatedAt: string | null;
-  idToName: Record<string, string>;
+  h2h: H2HTeam[]; h2hUpdatedAt: string | null; idToName: Record<string, string>;
 }) {
   const allRows = recalcGb(h2h.map((t, i) => ({ ...t, rank: i + 1 })));
   const sp1Rows = recalcGb(h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
@@ -1043,7 +1001,7 @@ export default function App() {
         )}
 
         {view === "grid" && <SeasonGrid liveScored={scored} snapshots={snapshots} idToName={idToName} currentWeekNum={currentWeekNum} />}
-        {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} idToName={idToName} currentWeekNum={currentWeekNum} />}
+        {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} idToName={idToName} />}
 
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
           <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
@@ -1070,7 +1028,7 @@ export default function App() {
 
               {commSection === "history" && (
                 <div>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Set weekly winners. Use "+ Team" for ties. All weeks are editable.</div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Set weekly winners. Use "+ Team" for ties. Weeks 1–22 only.</div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${C.border}` }}>
