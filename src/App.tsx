@@ -714,7 +714,7 @@ function StandingsTab({ h2h, h2hUpdatedAt, idToName, currentWeekNum }: {
           H2H standings last synced {toEastern(h2hUpdatedAt)} · Regular season final
         </div>
       )}
-      <PlayoffBracket idToName={idToName} currentWeekNum={currentWeekNum} />
+      <PlayoffBracket idToName={idToName} />
       <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Final regular season standings"
         emoji="🏆" borderColor="#86efac" accentColor="#15803d"
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
