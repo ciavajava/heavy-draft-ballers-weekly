@@ -32,6 +32,11 @@ const PLAYOFF_SEEDS: Record<number, string> = {
   6: "1",
 };
 
+// Reverse map: teamId -> seed number
+const TEAM_SEED: Record<string, number> = Object.fromEntries(
+  Object.entries(PLAYOFF_SEEDS).map(([seed, id]) => [id, parseInt(seed)])
+);
+
 const WEEK_SCHEDULE = [
   { week: 1,  start: "Mar 25", end: "Mar 29" },
   { week: 2,  start: "Mar 30", end: "Apr 5" },
@@ -408,7 +413,11 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
   const [loading, setLoading] = useState(true);
 
   const seed = (n: number) => PLAYOFF_SEEDS[n];
-  const name = (teamId: string) => idToName[teamId] ?? teamId;
+  const name = (teamId: string) => {
+    const s = TEAM_SEED[teamId];
+    return `(${s}) ${idToName[teamId] ?? teamId}`;
+  };
+  const nameOrTbd = (teamId?: string) => teamId ? name(teamId) : "TBD";
 
   useEffect(() => {
     const fetchPlayoffData = async () => {
@@ -475,12 +484,8 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
   const winnerB = r1MatchB?.winnerId;
   const loserB = r1MatchB ? (r1MatchB.teamA === winnerB ? r1MatchB.teamB : r1MatchB.teamA) : undefined;
 
-  const r2MatchC = round2.find(m =>
-    (m.teamA === seed(1) || m.teamB === seed(1))
-  );
-  const r2MatchD = round2.find(m =>
-    (m.teamA === seed(2) || m.teamB === seed(2))
-  );
+  const r2MatchC = round2.find(m => m.teamA === seed(1) || m.teamB === seed(1));
+  const r2MatchD = round2.find(m => m.teamA === seed(2) || m.teamB === seed(2));
   const r2MatchE = round2.find(m => m !== r2MatchC && m !== r2MatchD);
 
   const winnerC = r2MatchC?.winnerId;
@@ -488,11 +493,13 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
   const winnerD = r2MatchD?.winnerId;
   const loserD = r2MatchD ? (r2MatchD.teamA === winnerD ? r2MatchD.teamB : r2MatchD.teamA) : undefined;
 
-  const champMatch = championship.find(m =>
-    (winnerC && (m.teamA === winnerC || m.teamB === winnerC)) ||
-    (winnerD && (m.teamA === winnerD || m.teamB === winnerD))
-  ) ?? championship[0];
-  const thirdPlace = championship.find(m => m !== champMatch) ?? championship[1];
+  const champMatch = championship[0];
+  const thirdPlace = championship[1];
+
+  // Column background colors for visual separation
+  const col1Bg = "rgba(99,102,241,0.06)";
+  const col2Bg = "rgba(99,102,241,0.12)";
+  const col3Bg = "rgba(99,102,241,0.18)";
 
   const MatchCard = ({ teamId, isWinner, isBye }: {
     teamId?: string; isWinner?: boolean; isBye?: boolean;
@@ -500,12 +507,12 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
     <div style={{
       padding: "8px 12px", borderRadius: 6,
       border: `1px solid ${isWinner ? "#86efac" : isBye ? "#fde047" : C.border}`,
-      background: isWinner ? "rgba(34,197,94,0.1)" : isBye ? "rgba(251,191,36,0.1)" : C.bgAlt,
+      background: isWinner ? "rgba(34,197,94,0.12)" : isBye ? "rgba(251,191,36,0.1)" : C.bg,
       fontSize: 12, fontWeight: isWinner ? 700 : 400,
       color: isWinner ? "#15803d" : isBye ? "#854d0e" : teamId ? C.text : C.textFaint,
-      minWidth: 160, textAlign: "center" as const, whiteSpace: "nowrap" as const,
+      minWidth: 180, textAlign: "center" as const, whiteSpace: "nowrap" as const,
     }}>
-      {isBye ? `✓ Bye — ${teamId ? name(teamId) : ""}` : teamId ? name(teamId) : "TBD"}
+      {isBye ? `✓ Bye — ${nameOrTbd(teamId)}` : nameOrTbd(teamId)}
     </div>
   );
 
@@ -535,30 +542,28 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
           1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each
         </div>
       </div>
-      <div style={{ padding: 20, overflowX: "auto" }}>
-        <div style={{ display: "flex", gap: 24, alignItems: "flex-start", minWidth: 700 }}>
+      <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "flex", minWidth: 680 }}>
 
           {/* 1st Round */}
-          <div style={{ minWidth: 190 }}>
-            <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ flex: 1, padding: 20, background: col1Bg, borderRight: `1px solid ${C.border}` }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>1st Round</div>
               <div style={{ fontSize: 11, color: C.textFaint }}>Aug 31 – Sep 6</div>
             </div>
             <Matchup teamA={seed(3)} teamB={seed(6)} winnerId={r1MatchA?.winnerId} label="Match A" />
             <Matchup teamA={seed(4)} teamB={seed(5)} winnerId={r1MatchB?.winnerId} label="Match B" />
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>Byes</div>
+              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 8, textAlign: "center" }}>Byes</div>
               <MatchCard teamId={seed(1)} isBye />
               <div style={{ height: 8 }} />
               <MatchCard teamId={seed(2)} isBye />
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: C.textFaint, fontSize: 18 }}>→</div>
-
           {/* 2nd Round */}
-          <div style={{ minWidth: 190 }}>
-            <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ flex: 1, padding: 20, background: col2Bg, borderRight: `1px solid ${C.border}` }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>2nd Round</div>
               <div style={{ fontSize: 11, color: C.textFaint }}>Sep 7 – Sep 13</div>
             </div>
@@ -566,20 +571,33 @@ function PlayoffBracket({ idToName }: { idToName: Record<string, string> }) {
             <Matchup teamA={seed(2)} teamB={winnerB} winnerId={r2MatchD?.winnerId} label="Match D" />
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 4, textAlign: "center" }}>5th/6th Place</div>
-              <Matchup teamA={loserA} teamB={loserB} winnerId={r2MatchE?.winnerId} label="Match E" />
+              <Matchup
+                teamA={r1MatchA?.winnerId ? loserA : undefined}
+                teamB={r1MatchB?.winnerId ? loserB : undefined}
+                winnerId={r2MatchE?.winnerId}
+                label="Match E"
+              />
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: C.textFaint, fontSize: 18 }}>→</div>
-
           {/* Championship */}
-          <div style={{ minWidth: 190 }}>
-            <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <div style={{ flex: 1, padding: 20, background: col3Bg }}>
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Championship</div>
               <div style={{ fontSize: 11, color: C.textFaint }}>Sep 14 – Sep 20</div>
             </div>
-            <Matchup teamA={winnerC} teamB={winnerD} winnerId={champMatch?.winnerId} label="🏆 1st/2nd Place" />
-            <Matchup teamA={loserC} teamB={loserD} winnerId={thirdPlace?.winnerId} label="🥉 3rd/4th Place" />
+            <Matchup
+              teamA={winnerC}
+              teamB={winnerD}
+              winnerId={champMatch?.winnerId}
+              label="🏆 1st/2nd Place"
+            />
+            <Matchup
+              teamA={loserC}
+              teamB={loserD}
+              winnerId={thirdPlace?.winnerId}
+              label="🥉 3rd/4th Place"
+            />
           </div>
 
         </div>
@@ -669,7 +687,7 @@ function StandingsTab({ h2h, h2hUpdatedAt, idToName }: {
     <div>
       {h2hUpdatedAt && (
         <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 16 }}>
-          H2H standings last synced {toEastern(h2hUpdatedAt)} · Regular season final
+          H2H standings last synced {toEastern(h2hUpdatedAt)}
         </div>
       )}
       <PlayoffBracket idToName={idToName} />
