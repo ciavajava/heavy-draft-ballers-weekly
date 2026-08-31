@@ -691,9 +691,9 @@ function StandingsTab({ h2h, h2hUpdatedAt, idToName }: {
         </div>
       )}
       <PlayoffBracket idToName={idToName} />
-      <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Final regular season standings"
-        emoji="🏆" borderColor="#86efac" accentColor="#15803d"
-        payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
+      <PotSection title="Regular Season" subtitle=""
+  emoji="🏆" borderColor="#86efac" accentColor="#15803d"
+  payoutDesc={<span></span>}>
         <StandingsTable rows={allRows} prizes={{ 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 }} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
       </PotSection>
       <PotSection title="Side Pot #1" subtitle={`${SIDEPOT1_IDS.size} participants · Ranked by H2H finish among SP1 members only`}
