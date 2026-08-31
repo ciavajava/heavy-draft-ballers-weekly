@@ -16,11 +16,22 @@ const CATS = [
 ];
 
 const TOTAL_WEEKS = 25;
+const REGULAR_SEASON_WEEKS = 22;
 const COMM_PASSWORD = "maxmuncy";
 const WORKER_URL = "https://roto-sync-worker.eciavardini.workers.dev";
 
 const SIDEPOT1_IDS = new Set(["4", "5", "9", "2", "1", "6", "7", "11"]);
 const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
+
+// Playoff seeds from Yahoo standings (permanent for 2026 season)
+const PLAYOFF_SEEDS: Record<number, string> = {
+  1: "2",   // Albert's Pujol
+  2: "12",  // Acuña Matata
+  3: "11",  // Clever Name Here
+  4: "9",   // Buudy Mac's Dry Run
+  5: "1",   // Squeaky Green Beans
+  6: "8",   // Jim Leyland's Lungs
+};
 
 const WEEK_SCHEDULE = [
   { week: 1,  start: "Mar 25", end: "Mar 29" },
@@ -66,6 +77,7 @@ type Team = {
 };
 type ScoredTeam = Team & { pts: Record<string, number>; total: number };
 type WeekWinner = { week: number; teams: string[]; points: number; finalized?: boolean };
+type PlayoffMatchup = { teamA: string; teamB: string; winnerId?: string };
 
 const TEAMS_KEY = "roto_live_teams";
 const TIMESTAMP_KEY = "roto_last_updated";
@@ -118,11 +130,8 @@ function scoreAvgCategory(teams: Team[]): Record<string, number> {
 function computeRoto(teams: Team[]): ScoredTeam[] {
   const catScores: Record<string, Record<string, number>> = {};
   CATS.forEach(cat => {
-    if (cat.key === "avg") {
-      catScores[cat.key] = scoreAvgCategory(teams);
-    } else {
-      catScores[cat.key] = scoreCategory(teams, cat);
-    }
+    if (cat.key === "avg") catScores[cat.key] = scoreAvgCategory(teams);
+    else catScores[cat.key] = scoreCategory(teams, cat);
   });
   return teams.map(t => {
     const pts: Record<string, number> = {};
@@ -130,6 +139,17 @@ function computeRoto(teams: Team[]): ScoredTeam[] {
     CATS.forEach(cat => { pts[cat.key] = catScores[cat.key][t.name]; total += pts[cat.key]; });
     return { ...t, pts, total };
   }).sort((a, b) => b.total - a.total);
+}
+
+function getCurrentWeekNum() {
+  const now = new Date();
+  const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
+  return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
+}
+
+function getCompletedWeeks() {
+  const current = getCurrentWeekNum();
+  return WEEK_SCHEDULE.filter(w => w.week < current && w.week <= REGULAR_SEASON_WEEKS);
 }
 
 function fmtPts(v: number) { return Number.isInteger(v) ? v : v.toFixed(1); }
@@ -233,11 +253,9 @@ function BreakdownTable({ teams, sortKey, sortAsc, onSort, flashMap = {} }: {
               <td style={{ padding: "10px 8px", fontSize: 13, whiteSpace: "nowrap", verticalAlign: "middle", color: C.text }}>{t.name}</td>
               {CATS.map(c => (
                 <td key={c.key} style={{ padding: "10px 4px", textAlign: "right", verticalAlign: "middle" }}>
-                  <span
-                    className={flashMap[`${t.name}__stat__${c.key}`] || ""}
+                  <span className={flashMap[`${t.name}__stat__${c.key}`] || ""}
                     title={c.key === "avg" && t.hab ? `${t.hab} · ${parseHab(t.hab).avg.toFixed(6)}` : undefined}
-                    style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text, cursor: c.key === "avg" && t.hab ? "help" : "default" }}
-                  >
+                    style={{ display: "block", fontSize: 13, fontWeight: "bold", color: C.text, cursor: c.key === "avg" && t.hab ? "help" : "default" }}>
                     {c.fmt(t[c.key as keyof Team] as number)}
                   </span>
                   <span className={flashMap[`${t.name}__pts__${c.key}`] || ""} style={{ display: "block", fontSize: 10, color: C.textMuted, marginTop: 2 }}>
@@ -260,22 +278,25 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
   idToName: Record<string, string>;
   currentWeekNum: number;
 }) {
-  const completedWeekNums = Array.from({ length: currentWeekNum - 1 }, (_, i) => i + 1);
-  const allWeekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1);
+  const displayWeekNum = Math.min(currentWeekNum, REGULAR_SEASON_WEEKS);
+  const completedWeekNums = Array.from({ length: displayWeekNum - 1 }, (_, i) => i + 1);
+  const allWeekNums = Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => i + 1);
   const liveScores: Record<string, number> = {};
-  liveScored.forEach(t => { liveScores[t.teamId] = t.total; });
+  if (currentWeekNum <= REGULAR_SEASON_WEEKS) {
+    liveScored.forEach(t => { liveScores[t.teamId] = t.total; });
+  }
   const allTeamIds = liveScored.map(t => t.teamId);
   const seasonTotals: Record<string, number> = {};
   allTeamIds.forEach(id => {
     let total = 0;
     completedWeekNums.forEach(w => { const snap = snapshots[w]; if (snap && snap[id] != null) total += snap[id]; });
-    if (liveScores[id] != null) total += liveScores[id];
+    if (currentWeekNum <= REGULAR_SEASON_WEEKS && liveScores[id] != null) total += liveScores[id];
     seasonTotals[id] = total;
   });
   const sortedIds = [...allTeamIds].sort((a, b) => (seasonTotals[b] ?? 0) - (seasonTotals[a] ?? 0));
   const weekHighScores: Record<number, number> = {};
   completedWeekNums.forEach(w => { const snap = snapshots[w]; if (!snap) return; weekHighScores[w] = Math.max(...Object.values(snap)); });
-  const currentWeekHighScore = liveScored.length > 0 ? liveScored[0].total : 0;
+  const currentWeekHighScore = currentWeekNum <= REGULAR_SEASON_WEEKS && liveScored.length > 0 ? liveScored[0].total : 0;
   let kingScore = 0, kingId = "", kingWeek = 0;
   completedWeekNums.forEach(w => {
     const snap = snapshots[w]; if (!snap) return;
@@ -283,7 +304,8 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
   });
   const seasonLeaderId = sortedIds[0];
   const seasonLeaderTotal = seasonTotals[seasonLeaderId] ?? 0;
-  const visibleWeeks = allWeekNums.filter(w => w <= currentWeekNum + 2);
+  const visibleWeeks = allWeekNums.filter(w => w <= displayWeekNum + 2);
+
   return (
     <div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -318,11 +340,10 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
               <th style={{ textAlign: "left", padding: "6px 10px", fontWeight: 600, minWidth: 160, color: C.text, position: "sticky", left: 0, background: C.bg, zIndex: 1, verticalAlign: "top" }}>Team</th>
               <th style={{ textAlign: "right", padding: "6px 10px", fontWeight: 700, minWidth: 72, color: C.text, whiteSpace: "nowrap", background: "var(--bg-alt,#f9f9f9)", verticalAlign: "top" }}>Season Total</th>
               {visibleWeeks.map(w => {
-                const isCurrentWeek = w === currentWeekNum;
-                const isFuture = w > currentWeekNum;
+                const isCurrentWeek = w === currentWeekNum && currentWeekNum <= REGULAR_SEASON_WEEKS;
                 const sched = WEEK_SCHEDULE[w - 1];
                 return (
-                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isFuture ? C.textFaint : isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap", verticalAlign: "top" }}>
+                  <th key={w} style={{ textAlign: "right", padding: "4px 8px", fontWeight: isCurrentWeek ? 600 : 400, minWidth: 64, color: isCurrentWeek ? C.text : C.textMuted, whiteSpace: "nowrap", verticalAlign: "top" }}>
                     {isCurrentWeek ? <div style={{ fontSize: 9, color: "#3b82f6", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Current</div> : <div style={{ fontSize: 9, marginBottom: 2, visibility: "hidden" }}>·</div>}
                     <div>Wk {w}</div>
                     {sched && <div style={{ fontSize: 9, fontWeight: 400, color: C.textFaint }}>{sched.start}</div>}
@@ -342,19 +363,18 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
                 </td>
                 <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.text, background: "var(--bg-alt,#f9f9f9)" }}>{fmtPts(seasonTotals[id] ?? 0)}</td>
                 {visibleWeeks.map(w => {
-                  const isCurrentWeek = w === currentWeekNum;
-                  const isFuture = w > currentWeekNum;
+                  const isCurrentWeek = w === currentWeekNum && currentWeekNum <= REGULAR_SEASON_WEEKS;
                   const snap = snapshots[w];
                   const score = isCurrentWeek ? liveScores[id] : snap?.[id];
-                  const isWeekHigh = !isCurrentWeek && !isFuture && score != null && score === weekHighScores[w];
+                  const isWeekHigh = !isCurrentWeek && score != null && score === weekHighScores[w];
                   const isCurrentLeader = isCurrentWeek && score != null && score === currentWeekHighScore;
                   let cellBg = "transparent", cellColor = C.text;
                   let cellWeight: React.CSSProperties["fontWeight"] = 400;
                   if (isWeekHigh) { cellBg = "rgba(34,197,94,0.12)"; cellColor = "#15803d"; cellWeight = 700; }
                   else if (isCurrentLeader) { cellBg = "rgba(59,130,246,0.1)"; cellColor = "#2563eb"; cellWeight = 700; }
                   return (
-                    <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: isFuture ? C.textFaint : cellColor, fontWeight: cellWeight }}>
-                      {isFuture ? <span style={{ color: C.textFaint }}>—</span> : score != null ? <>{isWeekHigh ? "💰 " : ""}{fmtPts(score)}</> : <span style={{ color: C.textFaint }}>—</span>}
+                    <td key={w} style={{ padding: "9px 8px", textAlign: "right", background: cellBg, color: cellColor, fontWeight: cellWeight }}>
+                      {score != null ? <>{isWeekHigh ? "💰 " : ""}{fmtPts(score)}</> : <span style={{ color: C.textFaint }}>—</span>}
                     </td>
                   );
                 })}
@@ -364,8 +384,7 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
         </table>
       </div>
       <InfoSection>
-        <InfoRow>Highest scorer each week wins $25.</InfoRow>
-        <InfoRow>Weekly prizes are for regular season only and do not apply to fantasy playoffs.</InfoRow>
+        <InfoRow>Highest scorer each week wins $25. Regular season weeks 1–22 only.</InfoRow>
         <InfoRow>Season Total Leader — highest cumulative roto score across all regular season weeks. One $25 prize awarded at end of season.</InfoRow>
         <InfoRow>Score to Beat — highest single-week roto score by any team all season. One $25 prize awarded at end of season.</InfoRow>
         <InfoRow>Current week is live and updates every 5 minutes. Completed weeks are locked snapshots.</InfoRow>
@@ -374,15 +393,241 @@ function SeasonGrid({ liveScored, snapshots, idToName, currentWeekNum }: {
   );
 }
 
-// Recalculate GB relative to the leader within a subset of teams
 function recalcGb(rows: H2HTeam[]): H2HTeam[] {
   if (rows.length === 0) return rows;
   const leader = rows[0];
   return rows.map((t, i) => ({
-    ...t,
-    rank: i + 1,
+    ...t, rank: i + 1,
     gb: i === 0 ? 0 : ((leader.w - t.w) + (t.l - leader.l)) / 2,
   }));
+}
+
+// Playoff bracket component
+function PlayoffBracket({ idToName, currentWeekNum }: {
+  idToName: Record<string, string>;
+  currentWeekNum: number;
+}) {
+  const [round1, setRound1] = useState<PlayoffMatchup[]>([]);
+  const [round2, setRound2] = useState<PlayoffMatchup[]>([]);
+  const [championship, setChampionship] = useState<PlayoffMatchup[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const seed = (n: number) => PLAYOFF_SEEDS[n];
+  const name = (teamId: string) => idToName[teamId] ?? teamId;
+
+  useEffect(() => {
+    const fetchPlayoffData = async () => {
+      setLoading(true);
+      try {
+        // Fetch week 23 matchups (1st round)
+        const r23 = await fetch(`${WORKER_URL}?rawscoreboard=23`);
+        const d23 = await r23.json() as any;
+        const matchups23 = extractPlayoffMatchups(d23);
+
+        // Fetch week 24 matchups (2nd round)
+        const r24 = await fetch(`${WORKER_URL}?rawscoreboard=24`);
+        const d24 = await r24.json() as any;
+        const matchups24 = extractPlayoffMatchups(d24);
+
+        // Fetch week 25 matchups (championship)
+        const r25 = await fetch(`${WORKER_URL}?rawscoreboard=25`);
+        const d25 = await r25.json() as any;
+        const matchups25 = extractPlayoffMatchups(d25);
+
+        setRound1(matchups23);
+        setRound2(matchups24);
+        setChampionship(matchups25);
+      } catch (e) {
+        console.error("Failed to fetch playoff data", e);
+      }
+      setLoading(false);
+    };
+    fetchPlayoffData();
+  }, []);
+
+  function extractPlayoffMatchups(data: any): PlayoffMatchup[] {
+    try {
+      const matchupsRaw = data.fantasy_content?.league?.[1]?.scoreboard?.["0"]?.matchups;
+      if (!matchupsRaw || matchupsRaw.count === 0) return [];
+      const result: PlayoffMatchup[] = [];
+      for (let i = 0; i < matchupsRaw.count; i++) {
+        const matchup = matchupsRaw[String(i)]?.matchup;
+        if (!matchup) continue;
+        const teamsRaw = matchup?.["0"]?.teams;
+        if (!teamsRaw) continue;
+        const ids: string[] = [];
+        let winnerId: string | undefined;
+        for (let j = 0; j < 2; j++) {
+          const t = teamsRaw[String(j)]?.team;
+          if (!t) continue;
+          const info = t[0];
+          const teamIdObj = Array.isArray(info) ? info.find((x: any) => x?.team_id) : null;
+          if (teamIdObj?.team_id) ids.push(teamIdObj.team_id);
+          // Check for winner
+          const standings = t[2]?.team_standings;
+          if (standings?.outcome_totals) {
+            const wins = parseInt(standings.outcome_totals.wins ?? "0");
+            if (wins > 0 && !winnerId) winnerId = teamIdObj?.team_id;
+          }
+        }
+        if (ids.length === 2) result.push({ teamA: ids[0], teamB: ids[1], winnerId });
+      }
+      return result;
+    } catch { return []; }
+  }
+
+  // Determine winners/losers from round 1
+  const r1MatchA = round1.find(m => 
+    (m.teamA === seed(3) || m.teamB === seed(3)) &&
+    (m.teamA === seed(6) || m.teamB === seed(6))
+  );
+  const r1MatchB = round1.find(m =>
+    (m.teamA === seed(4) || m.teamB === seed(4)) &&
+    (m.teamA === seed(5) || m.teamB === seed(5))
+  );
+
+  const winnerA = r1MatchA?.winnerId;
+  const loserA = r1MatchA ? (r1MatchA.teamA === winnerA ? r1MatchA.teamB : r1MatchA.teamA) : undefined;
+  const winnerB = r1MatchB?.winnerId;
+  const loserB = r1MatchB ? (r1MatchB.teamA === winnerB ? r1MatchB.teamB : r1MatchB.teamA) : undefined;
+
+  // Round 2 matchups
+  const r2Championship = round2.find(m =>
+    (m.teamA === seed(1) || m.teamB === seed(1) || m.teamA === seed(2) || m.teamB === seed(2))
+  );
+  const r2Consolation = round2.find(m =>
+    m !== r2Championship && round2.length > 1
+  );
+
+  // Championship matchups
+  const finalMatch = championship.find(m => championship.indexOf(m) === 0);
+  const thirdPlace = championship.find(m => championship.indexOf(m) === 1);
+
+  const MatchCard = ({ teamId, isWinner, isPending, isBye }: {
+    teamId?: string; isWinner?: boolean; isPending?: boolean; isBye?: boolean;
+  }) => (
+    <div style={{
+      padding: "8px 12px",
+      borderRadius: 6,
+      border: `1px solid ${isWinner ? "#86efac" : isBye ? "#fde047" : C.border}`,
+      background: isWinner ? "rgba(34,197,94,0.1)" : isBye ? "rgba(251,191,36,0.1)" : C.bgAlt,
+      fontSize: 13,
+      fontWeight: isWinner ? 700 : 400,
+      color: isWinner ? "#15803d" : isBye ? "#854d0e" : teamId ? C.text : C.textFaint,
+      minWidth: 160,
+      textAlign: "center" as const,
+      whiteSpace: "nowrap" as const,
+    }}>
+      {isBye ? `✓ Bye — ${teamId ? name(teamId) : ""}` : teamId ? name(teamId) : isPending ? "TBD" : "—"}
+    </div>
+  );
+
+  const RoundLabel = ({ label, dates }: { label: string; dates: string }) => (
+    <div style={{ textAlign: "center", marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{label}</div>
+      <div style={{ fontSize: 11, color: C.textFaint }}>{dates}</div>
+    </div>
+  );
+
+  const Matchup = ({ teamA, teamB, winnerId, label }: {
+    teamA?: string; teamB?: string; winnerId?: string; label?: string;
+  }) => (
+    <div style={{ marginBottom: 16 }}>
+      {label && <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>{label}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <MatchCard teamId={teamA} isWinner={!!winnerId && teamA === winnerId} isPending={!teamA} />
+        <div style={{ fontSize: 11, color: C.textFaint, textAlign: "center" }}>vs</div>
+        <MatchCard teamId={teamB} isWinner={!!winnerId && teamB === winnerId} isPending={!teamB} />
+      </div>
+    </div>
+  );
+
+  if (loading) return <div style={{ fontSize: 13, color: C.textMuted, padding: "24px 0" }}>Loading bracket...</div>;
+
+  return (
+    <div style={{ marginBottom: 36, border: `1px solid #a78bfa`, borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: "var(--bg-alt,#f9f9f9)", borderBottom: "1px solid #a78bfa", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#6d28d9" }}>🏆 Playoffs</div>
+          <div style={{ fontSize: 12, color: C.text, marginTop: 3, opacity: 0.8 }}>Top 6 teams · Seeds 1 & 2 receive first-round byes</div>
+        </div>
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
+          1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each
+        </div>
+      </div>
+      <div style={{ padding: 20, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 32, alignItems: "flex-start", minWidth: 700 }}>
+
+          {/* 1st Round */}
+          <div style={{ minWidth: 200 }}>
+            <RoundLabel label="1st Round" dates="Aug 31 – Sep 6" />
+            <Matchup
+              teamA={seed(3)} teamB={seed(6)}
+              winnerId={r1MatchA?.winnerId}
+              label="Match A"
+            />
+            <Matchup
+              teamA={seed(4)} teamB={seed(5)}
+              winnerId={r1MatchB?.winnerId}
+              label="Match B"
+            />
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>Byes</div>
+              <MatchCard teamId={seed(1)} isBye />
+              <div style={{ height: 8 }} />
+              <MatchCard teamId={seed(2)} isBye />
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div style={{ display: "flex", alignItems: "center", paddingTop: 60, color: C.textFaint, fontSize: 20 }}>→</div>
+
+          {/* 2nd Round */}
+          <div style={{ minWidth: 200 }}>
+            <RoundLabel label="2nd Round" dates="Sep 7 – Sep 13" />
+            <Matchup
+              teamA={seed(1)} teamB={winnerA}
+              winnerId={r2Championship?.winnerId}
+              label="Match C"
+            />
+            <Matchup
+              teamA={seed(2)} teamB={winnerB}
+              winnerId={r2Consolation?.winnerId}
+              label="Match D"
+            />
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6, textAlign: "center" }}>5th/6th Place</div>
+              <Matchup
+                teamA={loserA} teamB={loserB}
+                winnerId={round2.find(m => m !== r2Championship && m !== r2Consolation)?.winnerId}
+                label="Match E"
+              />
+            </div>
+          </div>
+
+          {/* Arrow */}
+          <div style={{ display: "flex", alignItems: "center", paddingTop: 60, color: C.textFaint, fontSize: 20 }}>→</div>
+
+          {/* Championship */}
+          <div style={{ minWidth: 200 }}>
+            <RoundLabel label="Championship" dates="Sep 14 – Sep 20" />
+            <Matchup
+              teamA={r2Championship?.winnerId ? (r2Championship.teamA === r2Championship.winnerId ? r2Championship.teamA : r2Championship.teamB) : undefined}
+              teamB={r2Consolation?.winnerId ? (r2Consolation.teamA === r2Consolation.winnerId ? r2Consolation.teamA : r2Consolation.teamB) : undefined}
+              winnerId={finalMatch?.winnerId}
+              label="🏆 1st/2nd Place"
+            />
+            <Matchup
+              teamA={r2Championship?.winnerId ? (r2Championship.teamA === r2Championship.winnerId ? r2Championship.teamB : r2Championship.teamA) : undefined}
+              teamB={r2Consolation?.winnerId ? (r2Consolation.teamA === r2Consolation.winnerId ? r2Consolation.teamB : r2Consolation.teamA) : undefined}
+              winnerId={thirdPlace?.winnerId}
+              label="🥉 3rd/4th Place"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function StandingsTable({ rows, prizes, accentColor, accentBg, accentBorder, showPlayoff }: {
@@ -456,7 +701,10 @@ function PotSection({ title, subtitle, emoji, borderColor, accentColor, payoutDe
   );
 }
 
-function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: string | null }) {
+function StandingsTab({ h2h, h2hUpdatedAt, idToName, currentWeekNum }: {
+  h2h: H2HTeam[]; h2hUpdatedAt: string | null;
+  idToName: Record<string, string>; currentWeekNum: number;
+}) {
   const allRows = recalcGb(h2h.map((t, i) => ({ ...t, rank: i + 1 })));
   const sp1Rows = recalcGb(h2h.filter(t => SIDEPOT1_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
   const sp2Rows = recalcGb(h2h.filter(t => SIDEPOT2_IDS.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })));
@@ -464,10 +712,11 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
     <div>
       {h2hUpdatedAt && (
         <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 16 }}>
-          H2H standings last synced {toEastern(h2hUpdatedAt)}
+          H2H standings last synced {toEastern(h2hUpdatedAt)} · Regular season final
         </div>
       )}
-      <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Top 6 make playoffs · Top 2 get first-round byes"
+      <PlayoffBracket idToName={idToName} currentWeekNum={currentWeekNum} />
+      <PotSection title="Regular Season & Playoffs" subtitle="All 12 teams · Final regular season standings"
         emoji="🏆" borderColor="#86efac" accentColor="#15803d"
         payoutDesc={<span>1st <strong>$475</strong> · 2nd <strong>$275</strong> · 3rd <strong>$150</strong> · 4th–6th <strong>$25</strong> each</span>}>
         <StandingsTable rows={allRows} prizes={{ 1: 475, 2: 275, 3: 150, 4: 25, 5: 25, 6: 25 }} accentColor="#15803d" accentBg="rgba(34,197,94,0.1)" accentBorder="#86efac" showPlayoff={true} />
@@ -478,13 +727,12 @@ function StandingsTab({ h2h, h2hUpdatedAt }: { h2h: H2HTeam[]; h2hUpdatedAt: str
         <StandingsTable rows={sp1Rows} prizes={{ 1: 330, 2: 170, 3: 100 }} accentColor="#854d0e" accentBg="rgba(251,191,36,0.1)" accentBorder="#fde047" showPlayoff={false} />
       </PotSection>
       <PotSection title="Side Pot #2" subtitle={`${SIDEPOT2_IDS.size} participants · Ranked by H2H finish among SP2 members only`}
-        emoji="💵" borderColor="#93c5fd" accentColor="#1d4ed8"
+        emoji="💰" borderColor="#93c5fd" accentColor="#1d4ed8"
         payoutDesc={<span>1st <strong>$250</strong> · 2nd <strong>$150</strong></span>}>
         <StandingsTable rows={sp2Rows} prizes={{ 1: 250, 2: 150 }} accentColor="#1d4ed8" accentBg="rgba(59,130,246,0.1)" accentBorder="#93c5fd" showPlayoff={false} />
       </PotSection>
       <InfoSection>
-        <InfoRow>Yahoo StatTracker is the source of truth for live scoring — it's a great place to see live matchup results.</InfoRow>
-        <InfoRow>Commissioner will routinely update to keep scoring in sync with Yahoo, particularly for previous weeks.</InfoRow>
+        <InfoRow>Yahoo StatTracker is the source of truth for live scoring.</InfoRow>
         <InfoRow>Ratio ties (ERA, WHIP, OPS) will show as ties until the commissioner updates to match Yahoo.</InfoRow>
         <InfoRow>Side pot rankings are based on H2H finish within that pot's members only.</InfoRow>
       </InfoSection>
@@ -526,17 +774,6 @@ export default function App() {
   const currentWeekNum = getCurrentWeekNum();
   const currentWeekSched = WEEK_SCHEDULE[currentWeekNum - 1];
   const completedWeeks = getCompletedWeeks();
-
-  function getCurrentWeekNum() {
-    const now = new Date();
-    const adjusted = new Date(now.getTime() - 7 * 60 * 60 * 1000 - 45 * 60 * 1000);
-    return WEEK_STARTS.reduce((acc, d, i) => new Date(d) <= adjusted ? i + 1 : acc, 1);
-  }
-
-  function getCompletedWeeks() {
-    const current = getCurrentWeekNum();
-    return WEEK_SCHEDULE.filter(w => w.week < current);
-  }
 
   const triggerFlash = (newTeams: Team[]) => {
     const oldTeams = prevTeamsRef.current;
@@ -751,7 +988,7 @@ export default function App() {
       <InfoRow>R, HR, RBI, SB, W, K, QS, SVH (counting stats) split ties evenly.</InfoRow>
       <InfoRow>AVG uses precise H/AB ratio so ties at the display level are broken correctly.</InfoRow>
       <InfoRow>ERA, WHIP, and OPS use Yahoo's rounded values — weekly prize scores do not split ties for these categories.</InfoRow>
-      <InfoRow>Weekly scores will be finalized after any Yahoo stat corrections have been made. Weekly scores will show as "Pending" until then.</InfoRow>
+      <InfoRow>Weekly scores will be finalized after any Yahoo stat corrections have been made.</InfoRow>
     </InfoSection>
   );
 
@@ -807,7 +1044,7 @@ export default function App() {
         )}
 
         {view === "grid" && <SeasonGrid liveScored={scored} snapshots={snapshots} idToName={idToName} currentWeekNum={currentWeekNum} />}
-        {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} />}
+        {view === "standings" && <StandingsTab h2h={h2h} h2hUpdatedAt={h2hUpdatedAt} idToName={idToName} currentWeekNum={currentWeekNum} />}
 
         <div style={{ marginTop: 64, borderTop: `1px solid ${C.borderLight}`, paddingTop: 24 }}>
           <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>Commissioner</div>
@@ -845,7 +1082,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1).map(w => {
+                      {Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => i + 1).map(w => {
                         const locked = weekWinners[w];
                         const draft = weekDrafts[w];
                         const isEditing = !!draft;
@@ -921,7 +1158,6 @@ export default function App() {
               {commSection === "manual" && (
                 <div>
                   <div style={{ fontSize: 13, color: C.text, fontWeight: 500, marginBottom: 4 }}>Manual data override</div>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>The app auto-syncs from Yahoo every 5 minutes and locks each week automatically on Monday at 2:45am ET. Use this only as a fallback if the auto-sync is unavailable.</div>
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>To get the data: Yahoo Fantasy → Stat Tracker → League Stats → set to <strong>Week Totals</strong> → select all → copy → paste below.</div>
                   <textarea value={manualData} onChange={e => setManualData(e.target.value)} placeholder="Paste Yahoo table here..."
                     style={{ width: "100%", height: 180, fontSize: 11, fontFamily: "monospace", borderRadius: 6, border: `1px solid ${C.border}`, padding: 10, resize: "vertical", background: C.btnBg, color: C.text }} />
