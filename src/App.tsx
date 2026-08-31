@@ -26,11 +26,11 @@ const SIDEPOT2_IDS = new Set(["1", "6", "7", "11"]);
 // Playoff seeds from Yahoo standings (permanent for 2026 season)
 const PLAYOFF_SEEDS: Record<number, string> = {
   1: "2",   // Albert's Pujol
-  2: "12",  // Acuña Matata
-  3: "11",  // Clever Name Here
+  3: "12",  // Acuña Matata
+  2: "11",  // Clever Name Here
   4: "9",   // Buudy Mac's Dry Run
-  5: "1",   // Squeaky Green Beans
-  6: "8",   // Jim Leyland's Lungs
+  6: "1",   // Squeaky Green Beans
+  5: "8",   // Jim Leyland's Lungs
 };
 
 const WEEK_SCHEDULE = [
@@ -403,9 +403,8 @@ function recalcGb(rows: H2HTeam[]): H2HTeam[] {
 }
 
 // Playoff bracket component
-function PlayoffBracket({ idToName, currentWeekNum }: {
+function PlayoffBracket({ idToName }: {
   idToName: Record<string, string>;
-  currentWeekNum: number;
 }) {
   const [round1, setRound1] = useState<PlayoffMatchup[]>([]);
   const [round2, setRound2] = useState<PlayoffMatchup[]>([]);
